@@ -4,7 +4,7 @@ import {
   buildPool, draftState, pickProblem, remainingItems, newDraftId, buildBoard,
 } from './draft.js';
 import {
-  BOARD_ITEMS, BOARD_SPRITES, GAME_BOARD, COMPETENCY_BOARD, INNOVATION_BOARDS, DISCIPLINES,
+  BOARD_ITEMS, BOARD_SPRITES, GAME_BOARDS, gameBoardFor, COMPETENCY_BOARD, INNOVATION_BOARDS,
 } from './board-data.js';
 import { createBackend } from './backend.js';
 
@@ -172,7 +172,7 @@ function tileImage(category, item, extraClass = '') {
 function checkTileImages() {
   const files = new Set([
     ...Object.values(ALL_SPRITES).map((sheet) => sheet.file),
-    GAME_BOARD.file, COMPETENCY_BOARD.file,
+    ...GAME_BOARDS.map((board) => board.file), COMPETENCY_BOARD.file,
     ...Object.values(INNOVATION_BOARDS).map((board) => board.file),
   ]);
   for (const file of files) {
@@ -608,49 +608,28 @@ function boardFigure(layout, placements, extraClass = '') {
   }));
 }
 
-function renderGameBoard(board) {
+function renderGameBoard(board, n) {
+  const layout = gameBoardFor(n);
   const placements = board.rounds.map((id, i) => ({
-    box: GAME_BOARD.rounds[i], category: 'roundScores', item: boardItem('roundScores', id),
+    box: layout.rounds[i], category: 'roundScores', item: boardItem('roundScores', id),
   }));
-  placements.push({ box: GAME_BOARD.rounds[5], category: 'finalScores', item: boardItem('finalScores', board.finalScore) });
+  placements.push({ box: layout.rounds[5], category: 'finalScores', item: boardItem('finalScores', board.finalScore) });
   board.bookActions.forEach((id, i) => placements.push({
-    box: GAME_BOARD.bookActions[i], category: 'bookActions', item: boardItem('bookActions', id),
+    box: layout.bookActions[i], category: 'bookActions', item: boardItem('bookActions', id),
   }));
-  return boardFigure(GAME_BOARD, placements, 'game-board');
+  return boardFigure(layout, placements, 'game-board');
 }
 
-// The Innovation display: player-count sections on top of the Competency base section.
+// The Innovation display: the player-count sections above the Competency base section.
 function renderInnovationDisplay(board, n) {
-  const innovations = toInnovationList(board.innovations);
   const layout = INNOVATION_BOARDS[n];
-  const sections = layout
-    ? boardFigure(layout, innovations.map((item, i) => ({ box: layout.slots[i], category: 'innovations', item })))
-    : renderInnovationGrid(innovations, n);
+  const innovations = boardFigure(layout, board.innovations.map((id, i) => ({
+    box: layout.slots[i], category: 'innovations', item: boardItem('innovations', id),
+  })));
   const competencies = boardFigure(COMPETENCY_BOARD, board.competencies.map((id, i) => ({
     box: COMPETENCY_BOARD.slots[i], category: 'competencies', item: boardItem('competencies', id),
   })));
-  return h('div', { class: 'innovation-display' }, sections, competencies);
-}
-
-function toInnovationList(ids) {
-  return ids.map((id) => boardItem('innovations', id));
-}
-
-// Without a measured board image, lay the Innovation sections out in Discipline
-// columns: with an even number of players the top row has 2 tiles spanning 2 columns.
-function renderInnovationGrid(innovations, n) {
-  const spanning = n % 2 === 0 ? 2 : 0;
-  const colors = Object.values(DISCIPLINES).map((d) => d.color);
-  return h('div', { class: 'innovation-grid' }, innovations.map((item, i) => {
-    const wide = i < spanning;
-    const col = wide ? i * 2 : (i - spanning) % 4;
-    const el = tileImage('innovations', item);
-    el.title = `${item.name}: ${item.text}`;
-    return h('div', {
-      class: `innovation-cell${wide ? ' wide' : ''}`,
-      style: { '--col-a': colors[col], '--col-b': colors[wide ? col + 1 : col] },
-    }, el, h('span', { class: 'innovation-cell-name' }, item.name));
-  }));
+  return h('div', { class: 'innovation-display' }, innovations, competencies);
 }
 
 function renderBoardDetails(board) {
@@ -682,9 +661,9 @@ function renderBoardSetup(board, n) {
     },
     h('summary', {}, h('h2', {}, 'Board setup')),
     n === 2 && h('p', { class: 'muted small' },
-      '2-player game: use the 1–3 player side of the game board and place 1 Area Score tile face down.'),
+      '2-player game: also place 1 Area Score tile face down (it is revealed in Round 6).'),
     h('div', { class: 'board-layout' },
-      h('div', {}, h('h3', {}, 'Game board'), renderGameBoard(board)),
+      h('div', {}, h('h3', {}, 'Game board'), renderGameBoard(board, n)),
       h('div', {}, h('h3', {}, 'Innovation display'), renderInnovationDisplay(board, n))),
     renderBoardDetails(board)),
   );

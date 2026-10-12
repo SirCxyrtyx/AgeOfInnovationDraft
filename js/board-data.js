@@ -2,14 +2,6 @@
 // (setup steps 2–8 and Appendices III, VI, VIII and IX). `sprite` is the cell index
 // in Board Game Arena's sprite sheet for that kind of tile.
 
-// Disciplines, as shown by the Science Bonus side of the Round Score tiles.
-export const DISCIPLINES = {
-  banking: { name: 'Banking', color: '#e2b71f' },
-  law: { name: 'Law', color: '#2f6fc0' },
-  engineering: { name: 'Engineering', color: '#8a5a32' },
-  medicine: { name: 'Medicine', color: '#cfd8d6' },
-};
-
 // `building` is used to keep the Final Round Score tile from repeating the Round 6
 // building; `noLate` marks the tile that may not go in the Round 5 or 6 space.
 export const ROUND_SCORES = [
@@ -102,14 +94,26 @@ export const innovationCount = (players) => 2 * players + 2;
 
 // Board images and where tiles sit on them, in pixels of the image as measured.
 // Boxes are { x, y, w }; the height follows from the tile's aspect ratio.
-export const GAME_BOARD = {
+// Round 1 is the bottom Round Score space, Round 6 the top.
+const GAME_BOARD_3_5 = {
   file: 'game_board.jpg',
   width: 2000,
   height: 1282,
-  // Round 1 is the bottom space, Round 6 the top.
   rounds: [1023, 899, 774, 649, 524, 399].map((y) => ({ x: 31, y, w: 200 })),
   bookActions: [22, 236, 450].map((x) => ({ x, y: 1164, w: 190 })),
 };
+
+const GAME_BOARD_1_3 = {
+  file: 'game_board_2p.jpg',
+  width: 2000,
+  height: 1282,
+  rounds: [1033, 906, 780, 653, 527, 400].map((y) => ({ x: 37, y, w: 204 })),
+  bookActions: [22, 238, 452].map((x) => ({ x, y: 1162, w: 190 })),
+};
+
+// The 2-player game uses the 1–3 player side; 3 players use the recommended 3–5 side.
+export const gameBoardFor = (players) => (players <= 2 ? GAME_BOARD_1_3 : GAME_BOARD_3_5);
+export const GAME_BOARDS = [GAME_BOARD_1_3, GAME_BOARD_3_5];
 
 export const COMPETENCY_BOARD = {
   file: 'competency_board.jpg',
@@ -119,17 +123,15 @@ export const COMPETENCY_BOARD = {
   slots: [80, 290, 502, 714].flatMap((x) => [92, 216, 341].map((y) => ({ x, y, w: 108 }))),
 };
 
-// Innovation display sections above the base section, by player count. Only the
-// 4-player image has been measured; other counts are drawn without a background.
+// Innovation display sections above the base section, by player count. Even
+// player counts start with a row of 2 tiles that each span 2 Disciplines.
+const INNOVATION_COLUMNS = [20, 233, 446, 659];
+const innovationRow = (y) => INNOVATION_COLUMNS.map((x) => ({ x, y, w: 172 }));
+const spanningRow = [{ x: 127, y: 53, w: 172 }, { x: 551, y: 53, w: 172 }];
+
 export const INNOVATION_BOARDS = {
-  4: {
-    file: 'invention_board_4.jpg',
-    width: 850,
-    height: 564,
-    slots: [
-      { x: 127, y: 53, w: 172 },
-      { x: 551, y: 53, w: 172 },
-      ...[287, 433].flatMap((y) => [20, 233, 446, 659].map((x) => ({ x, y, w: 172 }))),
-    ],
-  },
+  2: { file: 'invention_board_2.jpg', width: 850, height: 423, slots: [...spanningRow, ...innovationRow(287)] },
+  3: { file: 'invention_board_3.jpg', width: 850, height: 423, slots: [...innovationRow(133), ...innovationRow(283)] },
+  4: { file: 'invention_board_4.jpg', width: 850, height: 564, slots: [...spanningRow, ...innovationRow(287), ...innovationRow(433)] },
+  5: { file: 'invention_board_5.jpg', width: 850, height: 564, slots: [133, 283, 433].flatMap(innovationRow) },
 };

@@ -313,12 +313,6 @@ table.players tr.me td:nth-child(2) { font-weight: 700; }
 .board-figure .tile.placed { position: absolute; box-shadow: none; border-radius: 0; }
 .no-tile-images .board-figure, .no-tile-images .board-layout, .no-tile-images .board-details .tile { display: none; }
 .innovation-display { display: flex; flex-direction: column; gap: 0; }
-.innovation-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; padding: 8px; background: var(--border); border-radius: 6px 6px 0 0; }
-.innovation-cell { background: linear-gradient(90deg, var(--col-a), var(--col-b)); padding: 4px; border-radius: 4px; display: flex; flex-direction: column; gap: 2px; }
-.innovation-cell.wide { grid-column: span 2; padding: 4px 25%; }
-.innovation-cell .tile { width: 100%; }
-.innovation-cell-name { font-size: 0.65rem; text-align: center; overflow-wrap: anywhere; line-height: 1.2; color: #2a2418; background: rgba(255, 255, 255, 0.7); border-radius: 3px; }
-.no-tile-images .innovation-cell-name { font-size: 0.8rem; }
 .board-details { margin-top: 12px; }
 .board-details > summary { cursor: pointer; font-weight: 600; }
 .board-details ul { list-style: none; padding: 0; margin: 0 0 8px; }
