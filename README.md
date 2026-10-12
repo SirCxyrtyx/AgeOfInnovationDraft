@@ -16,7 +16,9 @@ A small web app for running a setup draft for *Age of Innovation*, hosted on Git
 - Seat 1 is the start player. Once every player has one item from each category, the result shows each player's picks plus the 3 leftover round bonus tiles, which get a Coin each. **Copy summary** puts the result on the clipboard as text.
 - The host can **undo the last pick**, **pick for whoever's turn it is**, or send everyone **back to the lobby**.
 
-Component text is summarised from the rulebook appendices in `js/data.js`. The rulebook doesn't number the round bonus tiles, so they are numbered 1–10 in Appendix V order.
+Component text is summarised from the rulebook appendices in `js/data.js`. The rulebook doesn't number the round bonus tiles, so they are numbered 1–10 in the order of Board Game Arena's tile image.
+
+Tile artwork is hotlinked from Board Game Arena's sprite sheets; nothing is copied into this repo. The release folder in the URL is set by `IMAGE_BASE` in `js/data.js`. If BGA publishes a new release and the images stop loading, update that folder name. Until then, the app shows text-only cards.
 
 ## One-time setup
 

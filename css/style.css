@@ -239,6 +239,33 @@ button.icon { padding: 4px 9px; }
 .item.selected { outline: 3px solid var(--accent); background: var(--accent-soft); }
 .item.taken { opacity: 0.45; }
 .item.taken .item-name { text-decoration: line-through; }
+/* tile artwork */
+.tile {
+  display: block;
+  background-repeat: no-repeat;
+  border-radius: 6px;
+  flex: none;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+}
+.no-tile-images .tile { display: none; }
+
+.item-factions, .item-palaces { padding: 8px; }
+.item-factions .tile, .item-palaces .tile { width: 100%; }
+.item-terrains, .item-bonuses { flex-direction: row; align-items: flex-start; gap: 10px; }
+.item-terrains .tile { width: 72px; }
+.item-bonuses .tile { width: 64px; }
+.item-body { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.item.taken .tile { filter: grayscale(1); }
+
+.summary-tiles { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.summary-tiles .tile-bonuses { width: 48px; }
+.summary-row { display: flex; gap: 10px; align-items: flex-start; margin-top: 10px; }
+.summary-tile-slot { flex: none; width: 96px; display: flex; justify-content: center; }
+.no-tile-images .summary-tile-slot { display: none; }
+.summary-tile.tile-factions, .summary-tile.tile-palaces { width: 96px; }
+.summary-tile.tile-terrains { width: 52px; }
+.summary-tile.tile-bonuses { width: 40px; }
+
 .item-name { font-weight: 700; display: flex; align-items: center; gap: 6px; }
 .item-text { font-size: 0.84rem; color: var(--muted); }
 .item-taken { font-size: 0.8rem; font-weight: 600; }
@@ -274,7 +301,7 @@ table.players tr.me td:nth-child(2) { font-weight: 700; }
 .summary-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 260px), 1fr)); gap: 12px; margin-bottom: 12px; }
 .summary-player { border: 1px solid var(--border); border-top: 6px solid var(--swatch, var(--border)); border-radius: 8px; padding: 12px; }
 .summary-player dl { margin: 0; }
-.summary-player dt { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); margin-top: 8px; }
+.summary-player dt { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); }
 .summary-player dd { margin: 0; }
 
 /* toast */

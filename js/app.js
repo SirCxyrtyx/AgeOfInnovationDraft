@@ -1,4 +1,4 @@
-import { CATEGORIES, ITEMS, findItem, poolSize, MAX_PLAYERS } from './data.js';
+import { CATEGORIES, ITEMS, findItem, poolSize, MAX_PLAYERS, IMAGE_BASE, SPRITES } from './data.js';
 import {
   shuffle, buildTurnOrder, effectiveSeatOrder, availableItems, startProblems,
   buildPool, draftState, pickProblem, remainingItems, newDraftId,
@@ -135,6 +135,38 @@ async function copyText(text, message) {
 function playerName(id) {
   const p = draft && draft.players && draft.players[id];
   return p ? p.name : 'Unknown player';
+}
+
+// The tile artwork for an item, cut from its sprite sheet. Percentage offsets
+// keep this independent of the sheet's actual pixel size.
+function tileImage(category, item, extraClass = '') {
+  const sheet = SPRITES[category];
+  if (!sheet || item.sprite === undefined) return null;
+  const col = item.sprite % sheet.cols;
+  const row = Math.floor(item.sprite / sheet.cols);
+  const x = sheet.cols > 1 ? (col / (sheet.cols - 1)) * 100 : 0;
+  const y = sheet.rows > 1 ? (row / (sheet.rows - 1)) * 100 : 0;
+  return h('span', {
+    class: `tile tile-${category} ${extraClass}`,
+    role: 'img',
+    'aria-label': item.name,
+    style: {
+      'background-image': `url("${IMAGE_BASE}${sheet.file}")`,
+      'background-size': `${sheet.cols * 100}% ${sheet.rows * 100}%`,
+      'background-position': `${x}% ${y}%`,
+      'aspect-ratio': String(sheet.aspect),
+    },
+  });
+}
+
+// Background images don't report load errors, so probe each sheet once and
+// fall back to text-only cards if any of them can't be loaded.
+function checkTileImages() {
+  for (const sheet of Object.values(SPRITES)) {
+    const img = new Image();
+    img.onerror = () => document.body.classList.add('no-tile-images');
+    img.src = `${IMAGE_BASE}${sheet.file}`;
+  }
 }
 
 function itemLabel(category, id) {
@@ -582,14 +614,16 @@ function renderPoolCategory({ key, plural }, state, canAct) {
       const selectable = canAct && !pickProblem(state, current, key, id);
       const selected = ui.selected && ui.selected.category === key && ui.selected.item === id;
       return h('button', {
-        class: `item${takenBy ? ' taken' : ''}${selected ? ' selected' : ''}${selectable ? ' selectable' : ''}`,
+        class: `item item-${key}${takenBy ? ' taken' : ''}${selected ? ' selected' : ''}${selectable ? ' selectable' : ''}`,
         disabled: !selectable,
         style: item.color ? { '--swatch': item.color } : null,
         onclick: () => { ui.selected = { category: key, item: id }; render(); },
       },
-      h('span', { class: 'item-name' }, item.color && h('span', { class: 'swatch' }), item.name),
-      h('span', { class: 'item-text' }, item.text),
-      takenBy && h('span', { class: 'item-taken' }, `Taken by ${playerName(takenBy)}`));
+      tileImage(key, item),
+      h('span', { class: 'item-body' },
+        h('span', { class: 'item-name' }, item.color && h('span', { class: 'swatch' }), item.name),
+        h('span', { class: 'item-text' }, item.text),
+        takenBy && h('span', { class: 'item-taken' }, `Taken by ${playerName(takenBy)}`)));
     })),
   );
 }
@@ -689,23 +723,27 @@ function renderSummary(state) {
       const terrain = findItem('terrains', picks.terrains);
       return h('article', { class: 'summary-player', style: terrain ? { '--swatch': terrain.color } : null },
         h('h3', {}, `Seat ${i + 1}: ${playerName(pid)}`, i === 0 && h('span', { class: 'badge small' }, 'start player')),
-        h('dl', {}, CATEGORIES.map(({ key, label }) => {
+        CATEGORIES.map(({ key, label }) => {
           const item = findItem(key, picks[key]);
-          return [
-            h('dt', {}, label),
-            h('dd', {}, item ? [h('strong', {}, item.name), h('span', { class: 'muted small' }, ` ${item.text}`)] : '—'),
-          ];
-        })),
+          return h('div', { class: 'summary-row' },
+            h('span', { class: 'summary-tile-slot' }, item && tileImage(key, item, 'summary-tile')),
+            h('dl', {},
+              h('dt', {}, label),
+              h('dd', {}, item ? [h('strong', {}, item.name), h('span', { class: 'muted small' }, ` ${item.text}`)] : '—')));
+        }),
       );
     })),
     h('p', {}, h('strong', {}, 'Remaining Round Bonus tiles'), ' (place 1 Coin on each): ',
       leftover.map((id) => itemLabel('bonuses', id)).join(', ') || 'none'),
+    h('div', { class: 'summary-tiles' },
+      leftover.map((id) => tileImage('bonuses', findItem('bonuses', id), 'summary-tile'))),
   );
 }
 
 // ---------- boot ----------
 
 async function boot() {
+  checkTileImages();
   try {
     backend = await createBackend();
   } catch (err) {
@@ -713,7 +751,7 @@ async function boot() {
     app.replaceChildren(h('main', {},
       h('section', { class: 'card' },
         h('h2', {}, 'Could not connect'),
-        h('p', {}, 'The app could not sign in to Firebase. Check your connection and reload.'),
+        h('p', {}, 'The app could not connect to Firebase. Check your connection and reload.'),
         h('pre', { class: 'small muted' }, String(err && err.message ? err.message : err)),
       )));
     return;
