@@ -1,4 +1,5 @@
 // Game component data for Age of Innovation, summarised from the rulebook appendices.
+// Faction text includes the 09/2024 errata (Illusionists, Moles, Navigators).
 
 export const CATEGORIES = [
   { key: 'factions', label: 'Faction', plural: 'Factions' },
@@ -11,12 +12,12 @@ export const FACTIONS = [
   { id: 'blessed', name: 'Blessed', sprite: 11, text: 'Start: +1 Level in each Discipline. Phase III: Science Bonuses count their Level as 3 higher (also beyond 12).' },
   { id: 'felines', name: 'Felines', sprite: 4, text: 'Start: +1 Banking, +1 Medicine. When founding a City: advance 3 Levels in total and gain 1 Book of choice.' },
   { id: 'goblins', name: 'Goblins', sprite: 7, text: 'Start: +1 Banking, +1 Engineering, 1 Tool. Whenever they use a Spade: gain 2 Coins.' },
-  { id: 'illusionists', name: 'Illusionists', sprite: 0, text: 'Start: +2 Medicine. Power actions cost 1 less power and give 3 points (4 in a 5-player game).' },
+  { id: 'illusionists', name: 'Illusionists', sprite: 0, text: 'Start: +2 Medicine. Power actions cost 1 less power and give 1 point (2 points with 4–5 players).' },
   { id: 'inventors', name: 'Inventors', sprite: 8, text: 'After placing first Workshops and choosing a Round Bonus tile, gain a Competency tile of choice.' },
   { id: 'lizards', name: 'Lizards', sprite: 9, text: 'Start: +2 Levels in 1 Discipline or +1 in 2. When founding a City: free Terraform and Build with 1 Spade plus a free Workshop.' },
-  { id: 'moles', name: 'Moles', sprite: 5, text: 'Start: +2 Engineering. Tunneling: pay 1 Tool to skip a hex when building (4 points each). Action: pay 1 Tool to build a Bridge.' },
+  { id: 'moles', name: 'Moles', sprite: 5, text: 'Start: +2 Engineering. Tunneling: pay 1 Tool to skip a hex when building (2 points + 1 per player each). Action: pay 1 Tool to build a Bridge.' },
   { id: 'monks', name: 'Monks', sprite: 10, text: 'Start: +1 Law. Place only their University at setup (after all other placements) and gain its Competency tile.' },
-  { id: 'navigators', name: 'Navigators', sprite: 1, text: 'Start: +3 Law. Whenever they build a Workshop next to a river space: 2 points.' },
+  { id: 'navigators', name: 'Navigators', sprite: 1, text: 'Start: +3 Law. Whenever they build a Workshop next to a river space: 2 points and 1 Coin.' },
   { id: 'omar', name: 'Omar', sprite: 6, text: 'Start: +1 Banking, +1 Engineering, plus a Neutral Tower (Power value 2) as a third starting building. Income: 2 power, 2 Coins.' },
   { id: 'philosophers', name: 'Philosophers', sprite: 2, text: 'Start: +2 Banking. Each Competency tile also gives 1 Book of the same Discipline. Action: gain 1 Book of choice.' },
   { id: 'psychics', name: 'Psychics', sprite: 3, text: 'Start: +1 Banking, +1 Medicine, 1 Tool. Action: gain 5 power, then immediately take a second action.' },
