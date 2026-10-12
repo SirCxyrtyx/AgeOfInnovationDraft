@@ -295,6 +295,38 @@ table.players tr.me td:nth-child(2) { font-weight: 700; }
   box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.15);
 }
 
+/* board setup */
+.board-setup > details > summary { cursor: pointer; list-style: none; }
+.board-setup > details > summary::-webkit-details-marker { display: none; }
+.board-setup > details > summary h2 { display: inline; }
+.board-setup > details > summary::before { content: "▸ "; color: var(--muted); }
+.board-setup > details[open] > summary::before { content: "▾ "; }
+.board-layout { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; margin-top: 12px; }
+.innovation-display { max-width: 720px; }
+.board-figure {
+  position: relative;
+  width: 100%;
+  background-size: 100% 100%;
+  border-radius: 6px;
+  overflow: hidden;
+}
+.board-figure .tile.placed { position: absolute; box-shadow: none; border-radius: 0; }
+.no-tile-images .board-figure, .no-tile-images .board-layout, .no-tile-images .board-details .tile { display: none; }
+.innovation-display { display: flex; flex-direction: column; gap: 0; }
+.innovation-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; padding: 8px; background: var(--border); border-radius: 6px 6px 0 0; }
+.innovation-cell { background: linear-gradient(90deg, var(--col-a), var(--col-b)); padding: 4px; border-radius: 4px; display: flex; flex-direction: column; gap: 2px; }
+.innovation-cell.wide { grid-column: span 2; padding: 4px 25%; }
+.innovation-cell .tile { width: 100%; }
+.innovation-cell-name { font-size: 0.65rem; text-align: center; overflow-wrap: anywhere; line-height: 1.2; color: #2a2418; background: rgba(255, 255, 255, 0.7); border-radius: 3px; }
+.no-tile-images .innovation-cell-name { font-size: 0.8rem; }
+.board-details { margin-top: 12px; }
+.board-details > summary { cursor: pointer; font-weight: 600; }
+.board-details ul { list-style: none; padding: 0; margin: 0 0 8px; }
+.board-details li { display: flex; gap: 10px; align-items: center; padding: 4px 0; border-bottom: 1px solid var(--border); font-size: 0.9rem; }
+.tile.mini { width: 72px; }
+.tile.mini.tile-competencies { width: 40px; }
+.tile.mini.tile-finalScores { width: 72px; }
+
 /* summary */
 .summary-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
 .summary-head h2 { margin: 0; }

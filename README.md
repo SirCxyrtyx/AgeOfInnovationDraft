@@ -12,6 +12,11 @@ A small web app for running a setup draft for *Age of Innovation*, hosted on Git
   - **6** of the 7 terrains (Planning displays)
   - **N + 1** palace tiles (Palace #17, the one with the red back, is never used, as in the rulebook's draft variant)
   - **N + 3** round bonus tiles
+- The board is set up at the same time, following the rulebook's setup steps, so everyone can see it while drafting:
+  - 6 **Round Score tiles** and a **Final Round Score tile**. The Spade tile is never in Round 5 or 6, Rounds 1–5 never hold all three tiles of one Discipline, and the Final tile never repeats Round 6's building.
+  - 3 of the 6 **Book Action tiles**
+  - **2N + 2 Innovation tiles**
+  - all 12 **Competency tiles** on the Innovation display
 - Picks follow a **reverse snake**: the last seat picks first. With 4 players the order is 4‑3‑2‑1, 1‑2‑3‑4, 4‑3‑2‑1, 1‑2‑3‑4. On each pick, a player takes one item from any category they haven't filled yet.
 - Seat 1 is the start player. Once every player has one item from each category, the result shows each player's picks plus the 3 leftover round bonus tiles, which get a Coin each. **Copy summary** puts the result on the clipboard as text.
 - The host can **undo the last pick**, **pick for whoever's turn it is**, or send everyone **back to the lobby**.
@@ -49,7 +54,8 @@ Add `?local` to the URL (e.g. `http://localhost:8000/?local`) to use an in-brows
 | File | Purpose |
 | --- | --- |
 | `js/data.js` | Factions, terrains, palace and bonus tiles; pool sizes |
-| `js/draft.js` | Pure draft logic: pick order, pool drawing, legality checks |
+| `js/board-data.js` | Board setup tiles, sprite sheets and board slot positions |
+| `js/draft.js` | Pure draft logic: pick order, pool drawing, board setup, legality checks |
 | `js/backend.js` | Firebase backend and the `?local` fake backend |
 | `js/app.js` | UI |
 | `database.rules.json` | Realtime Database security rules |

@@ -1,6 +1,9 @@
 // Pure draft logic: no DOM or database access, so it can be unit tested in Node.
 
 import { CATEGORIES, ITEMS, poolSize, MIN_PLAYERS, MAX_PLAYERS } from './data.js';
+import {
+  ROUND_SCORES, FINAL_SCORES, BOOK_ACTIONS, INNOVATIONS, COMPETENCIES, innovationCount,
+} from './board-data.js';
 
 const CATEGORY_KEYS = CATEGORIES.map((c) => c.key);
 
@@ -76,6 +79,36 @@ export function buildPool(excluded, n, random = Math.random) {
     pool[key] = ITEMS[key].map((item) => item.id).filter((id) => chosen.includes(id));
   }
   return pool;
+}
+
+// Round Score tiles, indexed from Round 1, must follow the setup rules: the
+// "no late" tile can't be in Round 5 or 6, and Rounds 1–5 can't hold all three
+// tiles of one Discipline.
+export function roundScoresValid(rounds) {
+  if (rounds.slice(4).some((tile) => tile.noLate)) return false;
+  const counts = {};
+  for (const tile of rounds.slice(0, 5)) {
+    counts[tile.discipline] = (counts[tile.discipline] || 0) + 1;
+    if (counts[tile.discipline] >= 3) return false;
+  }
+  return true;
+}
+
+// Randomly sets up the board components that players see before drafting.
+export function buildBoard(n, random = Math.random) {
+  let rounds;
+  do {
+    rounds = shuffle(ROUND_SCORES, random).slice(0, 6);
+  } while (!roundScoresValid(rounds));
+  const round6 = rounds[5];
+  const finals = FINAL_SCORES.filter((tile) => tile.building !== round6.building);
+  return {
+    rounds: rounds.map((tile) => tile.id),
+    finalScore: shuffle(finals, random)[0].id,
+    bookActions: shuffle(BOOK_ACTIONS, random).slice(0, 3).map((tile) => tile.id),
+    innovations: shuffle(INNOVATIONS, random).slice(0, innovationCount(n)).map((tile) => tile.id),
+    competencies: shuffle(COMPETENCIES, random).map((tile) => tile.id),
+  };
 }
 
 // Derives everything the UI needs to know about an in-progress draft.

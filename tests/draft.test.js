@@ -2,9 +2,10 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { ITEMS, PALACES } from '../js/data.js';
+import { ROUND_SCORES, FINAL_SCORES } from '../js/board-data.js';
 import {
   toList, buildTurnOrder, effectiveSeatOrder, buildPool, draftState, pickProblem,
-  startProblems, remainingItems, newDraftId,
+  startProblems, remainingItems, newDraftId, buildBoard, roundScoresValid,
 } from '../js/draft.js';
 
 test('reverse snake starts with the last seat', () => {
@@ -122,4 +123,42 @@ test('pickProblem rejects illegal picks', () => {
 
 test('draft ids are 6 unambiguous characters', () => {
   for (let i = 0; i < 100; i++) assert.match(newDraftId(), /^[A-HJ-NP-Z2-9]{6}$/);
+});
+
+const roundTile = (id) => ROUND_SCORES.find((t) => t.id === id);
+
+test('board setup has the right number of each component', () => {
+  for (const n of [2, 3, 4, 5]) {
+    const board = buildBoard(n);
+    assert.equal(board.rounds.length, 6);
+    assert.equal(new Set(board.rounds).size, 6);
+    assert.equal(board.bookActions.length, 3);
+    assert.equal(board.innovations.length, 2 * n + 2);
+    assert.equal(new Set(board.innovations).size, 2 * n + 2);
+    assert.equal(board.competencies.length, 12);
+    assert.equal(new Set(board.competencies).size, 12);
+  }
+});
+
+test('round score setup rules always hold', () => {
+  for (let i = 0; i < 500; i++) {
+    const board = buildBoard(4);
+    const rounds = board.rounds.map(roundTile);
+    assert.ok(!rounds[4].noLate && !rounds[5].noLate, 'spade tile not in round 5 or 6');
+    for (const d of ['banking', 'law', 'engineering', 'medicine']) {
+      assert.ok(rounds.slice(0, 5).filter((t) => t.discipline === d).length < 3, `${d} not 3 times in rounds 1-5`);
+    }
+    const final = FINAL_SCORES.find((t) => t.id === board.finalScore);
+    assert.notEqual(final.building, rounds[5].building, 'final tile differs from round 6 building');
+  }
+});
+
+test('roundScoresValid rejects bad layouts', () => {
+  const ids = (...list) => list.map((n) => roundTile(`rs${n}`));
+  // rs4 is the spade tile: not allowed in round 5.
+  assert.equal(roundScoresValid(ids(1, 2, 5, 6, 4, 7)), false);
+  // rs1-rs3 are all Law: not allowed together in rounds 1-5.
+  assert.equal(roundScoresValid(ids(1, 2, 3, 5, 6, 7)), false);
+  // ...but fine when one of them is in round 6.
+  assert.equal(roundScoresValid(ids(1, 2, 5, 6, 7, 3)), true);
 });

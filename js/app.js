@@ -1,8 +1,11 @@
 import { CATEGORIES, ITEMS, findItem, poolSize, MAX_PLAYERS, IMAGE_BASE, SPRITES } from './data.js';
 import {
   shuffle, buildTurnOrder, effectiveSeatOrder, availableItems, startProblems,
-  buildPool, draftState, pickProblem, remainingItems, newDraftId,
+  buildPool, draftState, pickProblem, remainingItems, newDraftId, buildBoard,
 } from './draft.js';
+import {
+  BOARD_ITEMS, BOARD_SPRITES, GAME_BOARD, COMPETENCY_BOARD, INNOVATION_BOARDS, DISCIPLINES,
+} from './board-data.js';
 import { createBackend } from './backend.js';
 
 const app = document.getElementById('app');
@@ -15,7 +18,12 @@ let route = { page: 'home' };
 let draft = null; // latest snapshot of the current draft (null = not loaded / missing)
 let draftLoaded = false;
 let unsubscribe = null;
-let ui = { selected: null, joinName: null, addName: '', homeName: null, joinCode: '' };
+let ui = {
+  selected: null, joinName: null, addName: '', homeName: null, joinCode: '',
+  boardOpen: true, boardDetailsOpen: false,
+};
+
+const ALL_SPRITES = { ...SPRITES, ...BOARD_SPRITES };
 
 // ---------- small helpers ----------
 
@@ -140,7 +148,7 @@ function playerName(id) {
 // The tile artwork for an item, cut from its sprite sheet. Percentage offsets
 // keep this independent of the sheet's actual pixel size.
 function tileImage(category, item, extraClass = '') {
-  const sheet = SPRITES[category];
+  const sheet = ALL_SPRITES[category];
   if (!sheet || item.sprite === undefined) return null;
   const col = item.sprite % sheet.cols;
   const row = Math.floor(item.sprite / sheet.cols);
@@ -162,10 +170,15 @@ function tileImage(category, item, extraClass = '') {
 // Background images don't report load errors, so probe each sheet once and
 // fall back to text-only cards if any of them can't be loaded.
 function checkTileImages() {
-  for (const sheet of Object.values(SPRITES)) {
+  const files = new Set([
+    ...Object.values(ALL_SPRITES).map((sheet) => sheet.file),
+    GAME_BOARD.file, COMPETENCY_BOARD.file,
+    ...Object.values(INNOVATION_BOARDS).map((board) => board.file),
+  ]);
+  for (const file of files) {
     const img = new Image();
     img.onerror = () => document.body.classList.add('no-tile-images');
-    img.src = `${IMAGE_BASE}${sheet.file}`;
+    img.src = `${IMAGE_BASE}${file}`;
   }
 }
 
@@ -550,6 +563,7 @@ async function startDraft() {
     seatOrder: seats,
     turnOrder: buildTurnOrder(seats),
     pool: buildPool(draft.excluded || {}, seats.length),
+    board: buildBoard(seats.length),
     picks: null,
   });
 }
@@ -564,10 +578,115 @@ function renderDrafting(isHost) {
     renderTurnBanner(state, isHost),
     renderOrderStrip(state),
     state.done && renderSummary(state),
+    draft.board && renderBoardSetup(draft.board, state.seatOrder.length),
     h('div', { class: 'pool' }, CATEGORIES.map((cat) => renderPoolCategory(cat, state, canAct))),
     !state.done && renderPlayerTable(state),
     isHost && renderHostControls(state),
     ui.selected && renderConfirmBar(state),
+  );
+}
+
+// ----- board setup -----
+
+const boardItem = (category, id) => BOARD_ITEMS[category].find((item) => item.id === id);
+
+// A board image with tiles positioned on it. Boxes are in the image's pixels.
+function boardFigure(layout, placements, extraClass = '') {
+  return h('div', {
+    class: `board-figure ${extraClass}`,
+    style: {
+      'aspect-ratio': `${layout.width} / ${layout.height}`,
+      'background-image': `url("${IMAGE_BASE}${layout.file}")`,
+    },
+  }, placements.map(({ box, category, item }) => {
+    const el = tileImage(category, item, 'placed');
+    el.style.left = `${(box.x / layout.width) * 100}%`;
+    el.style.top = `${(box.y / layout.height) * 100}%`;
+    el.style.width = `${(box.w / layout.width) * 100}%`;
+    el.title = item.name ? `${item.name}: ${item.text}` : item.text;
+    return el;
+  }));
+}
+
+function renderGameBoard(board) {
+  const placements = board.rounds.map((id, i) => ({
+    box: GAME_BOARD.rounds[i], category: 'roundScores', item: boardItem('roundScores', id),
+  }));
+  placements.push({ box: GAME_BOARD.rounds[5], category: 'finalScores', item: boardItem('finalScores', board.finalScore) });
+  board.bookActions.forEach((id, i) => placements.push({
+    box: GAME_BOARD.bookActions[i], category: 'bookActions', item: boardItem('bookActions', id),
+  }));
+  return boardFigure(GAME_BOARD, placements, 'game-board');
+}
+
+// The Innovation display: player-count sections on top of the Competency base section.
+function renderInnovationDisplay(board, n) {
+  const innovations = toInnovationList(board.innovations);
+  const layout = INNOVATION_BOARDS[n];
+  const sections = layout
+    ? boardFigure(layout, innovations.map((item, i) => ({ box: layout.slots[i], category: 'innovations', item })))
+    : renderInnovationGrid(innovations, n);
+  const competencies = boardFigure(COMPETENCY_BOARD, board.competencies.map((id, i) => ({
+    box: COMPETENCY_BOARD.slots[i], category: 'competencies', item: boardItem('competencies', id),
+  })));
+  return h('div', { class: 'innovation-display' }, sections, competencies);
+}
+
+function toInnovationList(ids) {
+  return ids.map((id) => boardItem('innovations', id));
+}
+
+// Without a measured board image, lay the Innovation sections out in Discipline
+// columns: with an even number of players the top row has 2 tiles spanning 2 columns.
+function renderInnovationGrid(innovations, n) {
+  const spanning = n % 2 === 0 ? 2 : 0;
+  const colors = Object.values(DISCIPLINES).map((d) => d.color);
+  return h('div', { class: 'innovation-grid' }, innovations.map((item, i) => {
+    const wide = i < spanning;
+    const col = wide ? i * 2 : (i - spanning) % 4;
+    const el = tileImage('innovations', item);
+    el.title = `${item.name}: ${item.text}`;
+    return h('div', {
+      class: `innovation-cell${wide ? ' wide' : ''}`,
+      style: { '--col-a': colors[col], '--col-b': colors[wide ? col + 1 : col] },
+    }, el, h('span', { class: 'innovation-cell-name' }, item.name));
+  }));
+}
+
+function renderBoardDetails(board) {
+  const row = (category, item, label) => h('li', {},
+    tileImage(category, item, 'mini'),
+    h('span', {}, label && h('strong', {}, `${label}: `), item.name && h('strong', {}, `${item.name}. `), item.text));
+  return h('details', {
+    class: 'board-details',
+    open: ui.boardDetailsOpen || document.body.classList.contains('no-tile-images'),
+    ontoggle: (e) => { ui.boardDetailsOpen = e.target.open; },
+  },
+  h('summary', {}, 'Tile details'),
+  h('h3', {}, 'Round Score tiles'),
+  h('ul', {}, board.rounds.map((id, i) => row('roundScores', boardItem('roundScores', id), `Round ${i + 1}`)),
+    row('finalScores', boardItem('finalScores', board.finalScore), 'Final Round Score')),
+  h('h3', {}, 'Book Actions'),
+  h('ul', {}, board.bookActions.map((id) => row('bookActions', boardItem('bookActions', id)))),
+  h('h3', {}, 'Innovations'),
+  h('ul', {}, board.innovations.map((id) => row('innovations', boardItem('innovations', id)))),
+  h('h3', {}, 'Competency tiles'),
+  h('ul', {}, board.competencies.map((id) => row('competencies', boardItem('competencies', id)))));
+}
+
+function renderBoardSetup(board, n) {
+  return h('section', { class: 'card board-setup' },
+    h('details', {
+      open: ui.boardOpen,
+      ontoggle: (e) => { ui.boardOpen = e.target.open; },
+    },
+    h('summary', {}, h('h2', {}, 'Board setup')),
+    n === 2 && h('p', { class: 'muted small' },
+      '2-player game: use the 1–3 player side of the game board and place 1 Area Score tile face down.'),
+    h('div', { class: 'board-layout' },
+      h('div', {}, h('h3', {}, 'Game board'), renderGameBoard(board)),
+      h('div', {}, h('h3', {}, 'Innovation display'), renderInnovationDisplay(board, n))),
+    renderBoardDetails(board)),
   );
 }
 
@@ -682,7 +801,7 @@ function renderHostControls(state) {
   const reset = () => guarded(async () => {
     if (!confirm('Return to the lobby? All picks and the drawn components will be discarded.')) return;
     await backend.update(`drafts/${route.id}`, {
-      status: 'lobby', pool: null, turnOrder: null, picks: null, startedAt: null,
+      status: 'lobby', pool: null, board: null, turnOrder: null, picks: null, startedAt: null,
     });
   });
   return h('section', { class: 'card host-controls' },
