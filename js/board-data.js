@@ -51,7 +51,7 @@ export const INNOVATIONS = [
   { id: 'workshop', name: 'Workshop', sprite: 10, text: 'Immediately: build a Neutral Workshop. Income: 3 Tools.' },
   { id: 'guilds', name: 'Guilds', sprite: 11, text: 'Immediately: build a Neutral Guild. Income: 5 Coins.' },
   { id: 'schools', name: 'Schools', sprite: 12, text: 'Immediately: build a Neutral School and gain 1 Competency tile.' },
-  { id: 'university', name: 'University', sprite: 13, text: 'Immediately: build a Neutral University and gain a Competency (it founds a City with only 3 buildings). Income: 2 points.' },
+  { id: 'university', name: 'University', sprite: 13, text: 'Immediately: build a Neutral University (no Competency tile; it founds a City with only 3 buildings). Income: 2 points.' },
   { id: 'palace', name: 'Palace', sprite: 14, text: 'Immediately: build a Neutral Palace (no Palace tile) and add 2 power to Bowl III. Income: 4 power.' },
   { id: 'monument', name: 'Monument', sprite: 15, text: 'Immediately: build a Neutral Monument (Power value 4; founds a City with only 2 buildings) and gain 7 points.' },
   { id: 'libraries', name: 'Libraries', sprite: 16, text: 'Immediately: 1 point per Level in your two highest Disciplines.' },
