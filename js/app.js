@@ -405,9 +405,11 @@ function renderIdentityPicker() {
       h('p', { class: 'muted small' }, 'Already in this draft (maybe on another device)? Pick yourself:'),
       h('div', { class: 'chips' }, seats.map((id) => h('button', { class: 'chip', onclick: () => claim(id) }, draft.players[id].name))),
     ],
-    draft.status === 'lobby'
-      ? renderJoinForm()
-      : h('p', { class: 'muted small' }, 'The draft has started, so new players can no longer join. You can watch without picking.'),
+    draft.status !== 'lobby'
+      ? h('p', { class: 'muted small' }, 'The draft has started, so new players can no longer join. You can watch without picking.')
+      : seats.length >= MAX_PLAYERS
+        ? h('p', { class: 'muted small' }, `The draft is full (${MAX_PLAYERS} players), so no one else can join. You can watch without picking.`)
+        : renderJoinForm(),
   );
 }
 
@@ -502,10 +504,11 @@ function renderSeat(id, index, seats, isHost) {
 }
 
 function renderSeatControls(seats) {
+  const full = seats.length >= MAX_PLAYERS;
   const addPlayer = (e) => {
     e.preventDefault();
     const name = ui.addName.trim();
-    if (!name) return;
+    if (!name || full) return;
     ui.addName = '';
     guarded(() => backend.set(`drafts/${route.id}/players/${newPlayerId()}`, { name, joinedAt: Date.now() }));
   };
@@ -523,10 +526,11 @@ function renderSeatControls(seats) {
     }, 'Shuffle seats now'),
     h('form', { class: 'row', onsubmit: addPlayer },
       h('input', {
-        id: 'add-name', type: 'text', placeholder: 'Add a player by name', maxlength: 40,
+        id: 'add-name', type: 'text', maxlength: 40, disabled: full,
+        placeholder: full ? `Full: ${MAX_PLAYERS} players` : 'Add a player by name',
         value: ui.addName, oninput: (e) => { ui.addName = e.target.value; },
       }),
-      h('button', { type: 'submit', class: 'small' }, 'Add'),
+      h('button', { type: 'submit', class: 'small', disabled: full }, 'Add'),
     ),
   );
 }
