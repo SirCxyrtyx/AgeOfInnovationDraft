@@ -91,26 +91,26 @@ export function draftState(draft) {
   const pickedBy = {};
   for (const key of CATEGORY_KEYS) pickedBy[key] = {};
   for (const pick of picks) {
-    if (!byPlayer[pick.uid]) byPlayer[pick.uid] = {};
-    byPlayer[pick.uid][pick.category] = pick.item;
-    pickedBy[pick.category][pick.item] = pick.uid;
+    if (!byPlayer[pick.player]) byPlayer[pick.player] = {};
+    byPlayer[pick.player][pick.category] = pick.item;
+    pickedBy[pick.category][pick.item] = pick.player;
   }
 
   const pickIndex = picks.length;
   const done = turnOrder.length > 0 && pickIndex >= turnOrder.length;
-  const currentUid = done ? null : turnOrder[pickIndex] || null;
+  const currentPlayer = done ? null : turnOrder[pickIndex] || null;
 
-  return { seatOrder, turnOrder, picks, pool, byPlayer, pickedBy, pickIndex, done, currentUid };
+  return { seatOrder, turnOrder, picks, pool, byPlayer, pickedBy, pickIndex, done, currentPlayer };
 }
 
 // Returns null if the pick is legal, otherwise the reason it is not.
-export function pickProblem(state, uid, category, item) {
+export function pickProblem(state, player, category, item) {
   if (state.done) return 'The draft is finished.';
-  if (state.currentUid !== uid) return 'It is not this player\'s turn.';
+  if (state.currentPlayer !== player) return 'It is not this player\'s turn.';
   if (!CATEGORY_KEYS.includes(category)) return 'Unknown category.';
   if (!state.pool[category].includes(item)) return 'That item is not in the draft.';
   if (state.pickedBy[category][item]) return 'That item has already been taken.';
-  if (state.byPlayer[uid] && state.byPlayer[uid][category]) return 'This player already has one of those.';
+  if (state.byPlayer[player] && state.byPlayer[player][category]) return 'This player already has one of those.';
   return null;
 }
 

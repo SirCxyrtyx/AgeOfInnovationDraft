@@ -8,13 +8,14 @@ import { createBackend } from './backend.js';
 const app = document.getElementById('app');
 const NAME_KEY = 'aoi-name';
 const RECENT_KEY = 'aoi-recent';
+const PLAYER_KEY = 'aoi-players'; // { draftId: playerId } chosen on this device
 
 let backend = null;
 let route = { page: 'home' };
 let draft = null; // latest snapshot of the current draft (null = not loaded / missing)
 let draftLoaded = false;
 let unsubscribe = null;
-let ui = { selected: null, joinName: null, manualName: '', homeName: null, joinCode: '' };
+let ui = { selected: null, joinName: null, addName: '', homeName: null, joinCode: '' };
 
 // ---------- small helpers ----------
 
@@ -62,6 +63,41 @@ function rememberDraft(id, name) {
 
 function forgetDraft(id) {
   storageSet(RECENT_KEY, storageGet(RECENT_KEY, []).filter((r) => r.id !== id));
+}
+
+// Which player this device is playing as in each draft. In ?local mode this is
+// per tab, so several tabs can act as different players.
+function playerStore() {
+  return backend.isLocal ? sessionStorage : localStorage;
+}
+
+function savedPlayers() {
+  try {
+    return JSON.parse(playerStore().getItem(PLAYER_KEY) || '{}');
+  } catch {
+    return {};
+  }
+}
+
+function savePlayerId(draftId, playerId) {
+  const saved = savedPlayers();
+  if (playerId) saved[draftId] = playerId;
+  else delete saved[draftId];
+  try {
+    playerStore().setItem(PLAYER_KEY, JSON.stringify(saved));
+  } catch {
+    // Best-effort; the player can pick themselves again next time.
+  }
+}
+
+// The player this device is playing as in the current draft, if any.
+function me() {
+  const id = savedPlayers()[route.id];
+  return id && draft && draft.players && draft.players[id] ? id : null;
+}
+
+function newPlayerId() {
+  return `p-${Math.random().toString(36).slice(2, 10)}`;
 }
 
 function toast(message, kind = 'info') {
@@ -131,7 +167,7 @@ function updateTitle() {
   if (route.page === 'draft' && draft && draft.status === 'drafting') {
     const state = draftState(draft);
     if (state.done) title = `Draft complete · ${title}`;
-    else if (state.currentUid === backend.uid) title = `▶ Your pick! · ${title}`;
+    else if (state.currentPlayer && state.currentPlayer === me()) title = `▶ Your pick! · ${title}`;
   }
   document.title = title;
 }
@@ -151,17 +187,16 @@ function onRouteChange() {
   unsubscribe = null;
   draft = null;
   draftLoaded = false;
-  ui = { ...ui, selected: null, joinName: null, manualName: '' };
+  ui = { ...ui, selected: null, joinName: null, addName: '' };
   if (route.page === 'draft') {
     unsubscribe = backend.subscribe(`drafts/${route.id}`, (value) => {
       draft = value;
       draftLoaded = true;
-      if (draft && draft.players && draft.players[backend.uid]) {
-        rememberDraft(route.id, draft.players[backend.uid].name);
-      }
+      const mine = me();
+      if (mine) rememberDraft(route.id, draft.players[mine].name);
       if (ui.selected && draft && draft.status === 'drafting') {
         const state = draftState(draft);
-        const pick = pickProblem(state, state.currentUid, ui.selected.category, ui.selected.item);
+        const pick = pickProblem(state, state.currentPlayer, ui.selected.category, ui.selected.item);
         if (pick) ui.selected = null;
       }
       render();
@@ -242,16 +277,18 @@ function renderHome() {
 async function createDraft(name) {
   storageSet(NAME_KEY, name);
   const now = Date.now();
+  const playerId = newPlayerId();
   for (let attempt = 0; attempt < 5; attempt++) {
     const id = newDraftId();
     const created = await backend.create(`drafts/${id}`, {
       createdAt: now,
-      hostUid: backend.uid,
+      hostId: playerId,
       status: 'lobby',
       randomSeats: true,
-      players: { [backend.uid]: { name, joinedAt: now } },
+      players: { [playerId]: { name, joinedAt: now } },
     });
     if (created) {
+      savePlayerId(id, playerId);
       rememberDraft(id, name);
       location.hash = `#/d/${id}`;
       return;
@@ -274,9 +311,10 @@ function renderDraftPage() {
     );
   }
 
-  const isHost = draft.hostUid === backend.uid;
+  const isHost = !!me() && draft.hostId === me();
   return h('main', { class: 'draft' },
     renderDraftHeader(isHost),
+    !me() && renderIdentityPicker(),
     draft.status === 'lobby' ? renderLobby(isHost) : renderDrafting(isHost),
   );
 }
@@ -288,30 +326,58 @@ function renderDraftHeader(isHost) {
       h('a', { href: '#/', class: 'muted small back' }, '← Home'),
       h('h1', {}, 'Draft ', h('span', { class: 'code' }, route.id)),
       isHost && h('span', { class: 'badge' }, 'You are the host'),
+      me() && h('div', { class: 'small muted' },
+        'Playing as ', h('strong', {}, playerName(me())), ' · ',
+        h('button', {
+          class: 'link small',
+          onclick: () => { savePlayerId(route.id, null); ui.selected = null; render(); },
+        }, 'Switch player')),
     ),
     h('button', { onclick: () => copyText(link, 'Link copied.') }, 'Copy invite link'),
+  );
+}
+
+// Shown until this device has chosen which player it is. Choosing an existing
+// player lets someone carry on from another device.
+function renderIdentityPicker() {
+  const seats = draft.status === 'lobby' ? effectiveSeatOrder(draft) : draftState(draft).seatOrder;
+  const claim = (id) => {
+    savePlayerId(route.id, id);
+    rememberDraft(route.id, draft.players[id].name);
+    render();
+  };
+  return h('section', { class: 'card highlight' },
+    h('h2', {}, 'Who are you?'),
+    seats.length > 0 && [
+      h('p', { class: 'muted small' }, 'Already in this draft (maybe on another device)? Pick yourself:'),
+      h('div', { class: 'chips' }, seats.map((id) => h('button', { class: 'chip', onclick: () => claim(id) }, draft.players[id].name))),
+    ],
+    draft.status === 'lobby'
+      ? renderJoinForm()
+      : h('p', { class: 'muted small' }, 'The draft has started, so new players can no longer join. You can watch without picking.'),
   );
 }
 
 // ----- lobby -----
 
 function renderLobby(isHost) {
-  const me = backend.uid;
-  const joined = draft.players && draft.players[me];
+  const myId = me();
   const seats = effectiveSeatOrder(draft);
   const problems = startProblems(draft);
 
   return h('div', { class: 'lobby' },
-    !joined && renderJoinForm(),
     h('section', { class: 'card' },
       h('h2', {}, `Players (${seats.length}/${MAX_PLAYERS})`),
       h('p', { class: 'muted small' },
         'Seat 1 is the start player. The draft runs in reverse snake order: the last seat picks first.'),
       h('ol', { class: 'seats' }, seats.map((id, i) => renderSeat(id, i, seats, isHost))),
       isHost && renderSeatControls(seats),
-      joined && !isHost && h('button', {
+      myId && !isHost && h('button', {
         class: 'link danger small',
-        onclick: () => guarded(() => backend.set(`drafts/${route.id}/players/${me}`, null)),
+        onclick: () => guarded(async () => {
+          await backend.set(`drafts/${route.id}/players/${myId}`, null);
+          savePlayerId(route.id, null);
+        }),
       }, 'Leave draft'),
     ),
     renderExclusions(isHost, seats.length),
@@ -334,10 +400,15 @@ function renderJoinForm() {
     const name = ui.joinName.trim();
     if (!name) return toast('Enter your name first.', 'error');
     storageSet(NAME_KEY, name);
-    guarded(() => backend.set(`drafts/${route.id}/players/${backend.uid}`, { name, joinedAt: Date.now() }));
+    const playerId = newPlayerId();
+    guarded(async () => {
+      await backend.set(`drafts/${route.id}/players/${playerId}`, { name, joinedAt: Date.now() });
+      savePlayerId(route.id, playerId);
+      render();
+    });
   };
-  return h('section', { class: 'card highlight' },
-    h('h2', {}, 'Join this draft'),
+  return h('div', {},
+    h('p', { class: 'muted small' }, 'New here? Join with your name:'),
     h('form', { class: 'row', onsubmit: submit },
       h('input', {
         id: 'join-name', type: 'text', placeholder: 'Your name', maxlength: 40, value: ui.joinName,
@@ -359,14 +430,13 @@ function renderSeat(id, index, seats, isHost) {
   return h('li', { class: 'seat' },
     h('span', { class: 'seat-name' },
       player.name,
-      id === backend.uid && h('span', { class: 'muted' }, ' (you)'),
-      id === draft.hostUid && h('span', { class: 'badge small' }, 'host'),
-      player.manual && h('span', { class: 'badge small muted' }, 'added by host'),
+      id === me() && h('span', { class: 'muted' }, ' (you)'),
+      id === draft.hostId && h('span', { class: 'badge small' }, 'host'),
     ),
     isHost && h('span', { class: 'seat-actions' },
       h('button', { class: 'icon', title: 'Move up', disabled: index === 0, onclick: () => move(-1) }, '▲'),
       h('button', { class: 'icon', title: 'Move down', disabled: index === seats.length - 1, onclick: () => move(1) }, '▼'),
-      id !== backend.uid && h('button', {
+      id !== draft.hostId && h('button', {
         class: 'icon danger', title: 'Remove player',
         onclick: () => {
           if (confirm(`Remove ${player.name} from the draft?`)) {
@@ -379,13 +449,12 @@ function renderSeat(id, index, seats, isHost) {
 }
 
 function renderSeatControls(seats) {
-  const addManual = (e) => {
+  const addPlayer = (e) => {
     e.preventDefault();
-    const name = ui.manualName.trim();
+    const name = ui.addName.trim();
     if (!name) return;
-    ui.manualName = '';
-    const id = `manual-${Math.random().toString(36).slice(2, 10)}`;
-    guarded(() => backend.set(`drafts/${route.id}/players/${id}`, { name, joinedAt: Date.now(), manual: true }));
+    ui.addName = '';
+    guarded(() => backend.set(`drafts/${route.id}/players/${newPlayerId()}`, { name, joinedAt: Date.now() }));
   };
   return h('div', { class: 'seat-controls' },
     h('label', { class: 'check' },
@@ -399,10 +468,10 @@ function renderSeatControls(seats) {
       class: 'small',
       onclick: () => guarded(() => backend.update(`drafts/${route.id}`, { seatOrder: shuffle(seats), randomSeats: false })),
     }, 'Shuffle seats now'),
-    h('form', { class: 'row', onsubmit: addManual },
+    h('form', { class: 'row', onsubmit: addPlayer },
       h('input', {
-        id: 'manual-name', type: 'text', placeholder: 'Add a player without a device', maxlength: 40,
-        value: ui.manualName, oninput: (e) => { ui.manualName = e.target.value; },
+        id: 'add-name', type: 'text', placeholder: 'Add a player by name', maxlength: 40,
+        value: ui.addName, oninput: (e) => { ui.addName = e.target.value; },
       }),
       h('button', { type: 'submit', class: 'small' }, 'Add'),
     ),
@@ -457,8 +526,7 @@ async function startDraft() {
 
 function renderDrafting(isHost) {
   const state = draftState(draft);
-  const me = backend.uid;
-  const canAct = !state.done && (state.currentUid === me || isHost);
+  const canAct = !state.done && !!me() && (state.currentPlayer === me() || isHost);
 
   return h('div', { class: 'drafting' },
     renderTurnBanner(state, isHost),
@@ -475,9 +543,9 @@ function renderTurnBanner(state, isHost) {
   if (state.done) {
     return h('div', { class: 'banner done' }, 'Draft complete! Set up the game using the summary below.');
   }
-  const current = state.currentUid;
+  const current = state.currentPlayer;
   const step = `Pick ${state.pickIndex + 1} of ${state.turnOrder.length}`;
-  if (current === backend.uid) {
+  if (current === me()) {
     return h('div', { class: 'banner mine' },
       h('strong', {}, 'Your pick!'), ` Choose one item from a category you haven't filled yet. · ${step}`);
   }
@@ -491,11 +559,11 @@ function renderTurnBanner(state, isHost) {
 function renderOrderStrip(state) {
   return h('section', { class: 'card order' },
     h('h2', {}, 'Pick order'),
-    h('ol', { class: 'order-strip' }, state.turnOrder.map((uid, i) => {
+    h('ol', { class: 'order-strip' }, state.turnOrder.map((pid, i) => {
       const pick = state.picks[i];
       const cls = i < state.pickIndex ? 'past' : i === state.pickIndex ? 'current' : 'future';
-      return h('li', { class: `${cls}${uid === backend.uid ? ' me' : ''}` },
-        h('span', { class: 'order-name' }, playerName(uid)),
+      return h('li', { class: `${cls}${pid === me() ? ' me' : ''}` },
+        h('span', { class: 'order-name' }, playerName(pid)),
         pick && h('span', { class: 'order-pick' }, itemLabel(pick.category, pick.item)),
       );
     })),
@@ -503,11 +571,11 @@ function renderOrderStrip(state) {
 }
 
 function renderPoolCategory({ key, plural }, state, canAct) {
-  const current = state.currentUid;
+  const current = state.currentPlayer;
   const filled = current && state.byPlayer[current] && state.byPlayer[current][key];
   return h('section', { class: `card pool-category${filled ? ' filled' : ''}` },
     h('h2', {}, plural, filled && !state.done && h('span', { class: 'muted small' },
-      current === backend.uid ? ' · you already have one' : ` · ${playerName(current)} already has one`)),
+      current === me() ? ' · you already have one' : ` · ${playerName(current)} already has one`)),
     h('div', { class: 'items' }, state.pool[key].map((id) => {
       const item = findItem(key, id);
       const takenBy = state.pickedBy[key][id];
@@ -533,13 +601,13 @@ function renderPlayerTable(state) {
       h('table', { class: 'players' },
         h('thead', {}, h('tr', {}, h('th', {}, 'Seat'), h('th', {}, 'Player'),
           CATEGORIES.map((c) => h('th', {}, c.label)))),
-        h('tbody', {}, state.seatOrder.map((uid, i) => h('tr', {
-          class: `${uid === state.currentUid ? 'current' : ''}${uid === backend.uid ? ' me' : ''}`,
+        h('tbody', {}, state.seatOrder.map((pid, i) => h('tr', {
+          class: `${pid === state.currentPlayer ? 'current' : ''}${pid === me() ? ' me' : ''}`,
         },
         h('td', {}, i + 1),
-        h('td', {}, playerName(uid)),
+        h('td', {}, playerName(pid)),
         CATEGORIES.map(({ key }) => {
-          const id = state.byPlayer[uid] && state.byPlayer[uid][key];
+          const id = state.byPlayer[pid] && state.byPlayer[pid][key];
           return h('td', {}, id ? itemLabel(key, id) : h('span', { class: 'muted' }, '—'));
         })))),
       ),
@@ -549,13 +617,13 @@ function renderPlayerTable(state) {
 
 function renderConfirmBar(state) {
   const { category, item } = ui.selected;
-  const forOther = state.currentUid !== backend.uid;
-  const label = `${itemLabel(category, item)}${forOther ? ` for ${playerName(state.currentUid)}` : ''}`;
+  const forOther = state.currentPlayer !== me();
+  const label = `${itemLabel(category, item)}${forOther ? ` for ${playerName(state.currentPlayer)}` : ''}`;
   const confirm = () => guarded(async () => {
-    const problem = pickProblem(state, state.currentUid, category, item);
+    const problem = pickProblem(state, state.currentPlayer, category, item);
     if (problem) throw new Error(problem);
     const ok = await backend.create(`drafts/${route.id}/picks/${state.pickIndex}`, {
-      uid: state.currentUid, category, item, by: backend.uid, at: Date.now(),
+      player: state.currentPlayer, category, item, by: me(), at: Date.now(),
     });
     ui.selected = null;
     if (!ok) toast('That pick was already made by someone else.', 'error');
@@ -574,7 +642,7 @@ function renderHostControls(state) {
   const undo = () => guarded(async () => {
     const last = state.picks[state.pickIndex - 1];
     if (!last) return;
-    if (!confirm(`Undo ${playerName(last.uid)}'s pick of ${itemLabel(last.category, last.item)}?`)) return;
+    if (!confirm(`Undo ${playerName(last.player)}'s pick of ${itemLabel(last.category, last.item)}?`)) return;
     await backend.set(`drafts/${route.id}/picks/${state.pickIndex - 1}`, null);
   });
   const reset = () => guarded(async () => {
@@ -596,9 +664,9 @@ function renderHostControls(state) {
 
 function summaryText(state) {
   const lines = [`Age of Innovation draft ${route.id}`, ''];
-  state.seatOrder.forEach((uid, i) => {
-    const picks = state.byPlayer[uid] || {};
-    lines.push(`Seat ${i + 1}${i === 0 ? ' (start player)' : ''}: ${playerName(uid)}`);
+  state.seatOrder.forEach((pid, i) => {
+    const picks = state.byPlayer[pid] || {};
+    lines.push(`Seat ${i + 1}${i === 0 ? ' (start player)' : ''}: ${playerName(pid)}`);
     for (const { key, label } of CATEGORIES) {
       const item = findItem(key, picks[key]);
       lines.push(`  ${label}: ${item ? `${item.name} (${item.text})` : '—'}`);
@@ -616,11 +684,11 @@ function renderSummary(state) {
       h('h2', {}, 'Result'),
       h('button', { class: 'primary', onclick: () => copyText(summaryText(state), 'Summary copied.') }, 'Copy summary'),
     ),
-    h('div', { class: 'summary-grid' }, state.seatOrder.map((uid, i) => {
-      const picks = state.byPlayer[uid] || {};
+    h('div', { class: 'summary-grid' }, state.seatOrder.map((pid, i) => {
+      const picks = state.byPlayer[pid] || {};
       const terrain = findItem('terrains', picks.terrains);
       return h('article', { class: 'summary-player', style: terrain ? { '--swatch': terrain.color } : null },
-        h('h3', {}, `Seat ${i + 1}: ${playerName(uid)}`, i === 0 && h('span', { class: 'badge small' }, 'start player')),
+        h('h3', {}, `Seat ${i + 1}: ${playerName(pid)}`, i === 0 && h('span', { class: 'badge small' }, 'start player')),
         h('dl', {}, CATEGORIES.map(({ key, label }) => {
           const item = findItem(key, picks[key]);
           return [

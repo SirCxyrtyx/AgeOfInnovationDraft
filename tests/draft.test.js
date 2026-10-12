@@ -83,12 +83,12 @@ test('a full draft gives each player one item per category', () => {
   const draft = playDraft(['a', 'b', 'c']);
   let state = draftState(draft);
   while (!state.done) {
-    const uid = state.currentUid;
+    const uid = state.currentPlayer;
     const choice = ['factions', 'terrains', 'palaces', 'bonuses']
       .flatMap((category) => remainingItems(state, category).map((item) => ({ category, item })))
       .find(({ category, item }) => !pickProblem(state, uid, category, item));
     assert.ok(choice, 'there is always a legal pick');
-    draft.picks.push({ uid, ...choice });
+    draft.picks.push({ player: uid, ...choice });
     state = draftState(draft);
   }
   assert.equal(state.picks.length, 12);
@@ -103,19 +103,19 @@ test('pickProblem rejects illegal picks', () => {
   const draft = playDraft(['a', 'b']);
   draft.pool = { factions: ['blessed', 'moles', 'omar'], terrains: ['lake'], palaces: ['p1'], bonuses: ['b1'] };
   let state = draftState(draft);
-  assert.equal(state.currentUid, 'b');
+  assert.equal(state.currentPlayer, 'b');
   assert.ok(pickProblem(state, 'a', 'factions', 'blessed'), 'not your turn');
   assert.ok(pickProblem(state, 'b', 'factions', 'felines'), 'not in pool');
   assert.equal(pickProblem(state, 'b', 'factions', 'blessed'), null);
 
-  draft.picks.push({ uid: 'b', category: 'factions', item: 'blessed' });
+  draft.picks.push({ player: 'b', category: 'factions', item: 'blessed' });
   state = draftState(draft);
-  assert.equal(state.currentUid, 'a');
+  assert.equal(state.currentPlayer, 'a');
   assert.ok(pickProblem(state, 'a', 'factions', 'blessed'), 'already taken');
 
-  draft.picks.push({ uid: 'a', category: 'factions', item: 'moles' });
+  draft.picks.push({ player: 'a', category: 'factions', item: 'moles' });
   state = draftState(draft);
-  assert.equal(state.currentUid, 'a', 'snake: a picks twice in a row');
+  assert.equal(state.currentPlayer, 'a', 'snake: a picks twice in a row');
   assert.ok(pickProblem(state, 'a', 'factions', 'omar'), 'already has a faction');
   assert.equal(pickProblem(state, 'a', 'terrains', 'lake'), null);
 });

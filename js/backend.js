@@ -1,10 +1,11 @@
 // Storage backends. Both expose the same small API:
-//   uid, subscribe(path, cb) -> unsubscribe, get(path), set(path, value),
+//   isLocal, subscribe(path, cb) -> unsubscribe, get(path), set(path, value),
 //   update(path, values), create(path, value) -> true if it did not exist yet.
 //
-// The Firebase backend is the real one. The local backend keeps everything in
-// localStorage and syncs between tabs of the same browser; open the app with
-// ?local in the URL to use it for offline testing.
+// The Firebase backend is the real one. There is no sign-in: drafts are open to
+// anyone with the link. The local backend keeps everything in localStorage and
+// syncs between tabs of the same browser; open the app with ?local in the URL to
+// use it for offline testing.
 
 import { firebaseConfig, FIREBASE_SDK_VERSION } from './firebase-config.js';
 
@@ -15,28 +16,16 @@ export async function createBackend() {
 
 async function createFirebaseBackend() {
   const base = `https://www.gstatic.com/firebasejs/${FIREBASE_SDK_VERSION}`;
-  const [{ initializeApp }, authMod, dbMod] = await Promise.all([
+  const [{ initializeApp }, dbMod] = await Promise.all([
     import(`${base}/firebase-app.js`),
-    import(`${base}/firebase-auth.js`),
     import(`${base}/firebase-database.js`),
   ]);
   const app = initializeApp(firebaseConfig);
-  const auth = authMod.getAuth(app);
   const db = dbMod.getDatabase(app);
-
-  const user = await new Promise((resolve, reject) => {
-    const stop = authMod.onAuthStateChanged(auth, (u) => {
-      if (u) {
-        stop();
-        resolve(u);
-      }
-    });
-    authMod.signInAnonymously(auth).catch(reject);
-  });
 
   const r = (path) => dbMod.ref(db, path);
   return {
-    uid: user.uid,
+    isLocal: false,
     subscribe(path, cb, onError) {
       return dbMod.onValue(r(path), (snap) => cb(snap.val()), onError);
     },
@@ -56,12 +45,6 @@ function createLocalBackend() {
   const KEY = 'aoi-local-db';
   const channel = new BroadcastChannel('aoi-local-db');
   const listeners = new Set();
-
-  let uid = sessionStorage.getItem('aoi-local-uid');
-  if (!uid) {
-    uid = `local-${Math.random().toString(36).slice(2, 10)}`;
-    sessionStorage.setItem('aoi-local-uid', uid);
-  }
 
   const parts = (path) => path.split('/').filter(Boolean);
   const load = () => JSON.parse(localStorage.getItem(KEY) || '{}');
@@ -92,7 +75,7 @@ function createLocalBackend() {
   channel.onmessage = notify;
 
   return {
-    uid,
+    isLocal: true,
     subscribe(path, cb) {
       const l = { path, cb };
       listeners.add(l);

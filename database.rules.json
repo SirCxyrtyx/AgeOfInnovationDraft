@@ -2,17 +2,11 @@
   "rules": {
     "drafts": {
       "$draftId": {
-        ".read": "auth != null",
-        ".write": "auth != null && ((!data.exists() && newData.child('hostUid').val() === auth.uid) || data.child('hostUid').val() === auth.uid)",
+        ".read": true,
+        ".write": true,
         "players": {
-          "$uid": {
-            ".write": "auth != null && auth.uid === $uid && data.parent().parent().child('status').val() === 'lobby'",
+          "$playerId": {
             ".validate": "newData.hasChildren(['name', 'joinedAt']) && newData.child('name').isString() && newData.child('name').val().length > 0 && newData.child('name').val().length <= 40"
-          }
-        },
-        "picks": {
-          "$i": {
-            ".write": "auth != null && !data.exists() && newData.exists() && data.parent().parent().child('status').val() === 'drafting' && data.parent().parent().child('turnOrder').child($i).val() === auth.uid && newData.child('uid').val() === auth.uid && newData.child('by').val() === auth.uid"
           }
         }
       }

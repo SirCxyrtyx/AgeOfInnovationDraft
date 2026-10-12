@@ -4,7 +4,8 @@ A small web app for running a setup draft for *Age of Innovation*, hosted on Git
 
 ## How the draft works
 
-- The host creates a draft and shares the link. Players open it and enter a name. The host can also add players who don't have a device and pick for them.
+- The host creates a draft and shares the link. Players open it and enter a name. The host can also add players by name.
+- There are no accounts. Each device remembers which player it is in each draft. On any other device, open the link and pick your name under **Who are you?** to carry on, for example starting on a computer and finishing on a phone. **Switch player** in the header forgets the choice on that device.
 - In the lobby the host can reorder seats (or leave **Randomize seat order** on) and exclude any components that shouldn't be drawn.
 - On start, these are drawn at random for **N** players:
   - **N + 1** factions
@@ -23,16 +24,9 @@ Component text is summarised from the rulebook appendices in `js/data.js`. The r
 
 In the [Firebase console](https://console.firebase.google.com/project/ageofinnovationdraft):
 
-1. **Authentication → Sign-in method**: enable **Anonymous**.
-2. **Realtime Database → Rules**: paste in the contents of `database.rules.json` and publish. These rules allow:
-   - only the host to change settings, start the draft, undo or reset it;
-   - players to add or remove only themselves, and only in the lobby;
-   - a player to pick only on their own turn, and never to overwrite an existing pick.
-3. **Authentication → Settings → Authorized domains**: add `sircxyrtyx.github.io` if it isn't listed.
+- **Realtime Database → Rules**: paste in the contents of `database.rules.json` and publish. If you use the Firebase CLI, `firebase deploy --only database` does the same.
 
-If you use the Firebase CLI, `firebase deploy --only database` does step 2.
-
-The web config in `js/firebase-config.js` is meant to be public. The database rules are what control access.
+The app is built for friends who trust each other, so there is no sign-in. Anyone with a draft's link can read it and change it, but drafts can't be listed, so a draft can only be found by its code. The web config in `js/firebase-config.js` is meant to be public.
 
 ### GitHub Pages
 
@@ -48,7 +42,7 @@ npm start          # serves the folder on http://localhost:8000
 npm test           # unit tests for the draft logic (Node 20+)
 ```
 
-Add `?local` to the URL (e.g. `http://localhost:8000/?local`) to use an in-browser fake database instead of Firebase. Each tab acts as a different player, which makes it easy to try a whole draft offline.
+Add `?local` to the URL (e.g. `http://localhost:8000/?local`) to use an in-browser fake database instead of Firebase. Each tab acts as a different device, which makes it easy to try a whole draft offline.
 
 | File | Purpose |
 | --- | --- |
