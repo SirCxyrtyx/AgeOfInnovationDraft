@@ -578,10 +578,14 @@ function renderDrafting(isHost) {
     renderTurnBanner(state, isHost),
     renderOrderStrip(state),
     state.done && renderSummary(state),
-    draft.board && renderBoardSetup(draft.board, state.seatOrder.length),
+    // On very wide screens the side column (board and players) sits beside the
+    // picks; otherwise its children flow in place, with the footer after the picks.
+    h('div', { class: 'drafting-side' },
+      draft.board && renderBoardSetup(draft.board, state.seatOrder.length),
+      h('div', { class: 'drafting-footer' },
+        !state.done && renderPlayerTable(state),
+        isHost && renderHostControls(state))),
     h('div', { class: 'pool' }, CATEGORIES.map((cat) => renderPoolCategory(cat, state, canAct))),
-    !state.done && renderPlayerTable(state),
-    isHost && renderHostControls(state),
     ui.selected && renderConfirmBar(state),
   );
 }
