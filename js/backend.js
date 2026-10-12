@@ -1,6 +1,7 @@
 // Storage backends. Both expose the same small API:
 //   isLocal, subscribe(path, cb) -> unsubscribe, get(path), set(path, value),
-//   update(path, values), create(path, value) -> true if it did not exist yet.
+//   update(path, values), create(path, value) -> true if it did not exist yet,
+//   transaction(path, fn) -> true if fn's result was written (undefined aborts).
 //
 // The Firebase backend is the real one. There is no sign-in: drafts are open to
 // anyone with the link. The local backend keeps everything in localStorage and
@@ -36,6 +37,10 @@ async function createFirebaseBackend() {
     update: (path, values) => dbMod.update(r(path), values),
     async create(path, value) {
       const result = await dbMod.runTransaction(r(path), (current) => (current === null ? value : undefined));
+      return result.committed;
+    },
+    async transaction(path, fn) {
+      const result = await dbMod.runTransaction(r(path), fn);
       return result.committed;
     },
   };
@@ -99,6 +104,14 @@ function createLocalBackend() {
       const root = load();
       if (read(root, path) !== null) return false;
       write(root, path, value);
+      commit(root);
+      return true;
+    },
+    async transaction(path, fn) {
+      const root = load();
+      const next = fn(read(root, path));
+      if (next === undefined) return false;
+      write(root, path, next);
       commit(root);
       return true;
     },

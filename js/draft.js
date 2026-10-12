@@ -132,8 +132,44 @@ export function draftState(draft) {
   const pickIndex = picks.length;
   const done = turnOrder.length > 0 && pickIndex >= turnOrder.length;
   const currentPlayer = done ? null : turnOrder[pickIndex] || null;
+  const nextSlot = nextPickSlot(draft.picks);
 
-  return { seatOrder, turnOrder, picks, pool, byPlayer, pickedBy, pickIndex, done, currentPlayer };
+  return { seatOrder, turnOrder, picks, pool, byPlayer, pickedBy, pickIndex, nextSlot, done, currentPlayer };
+}
+
+// Slot numbers of the stored picks, in order. Firebase may return the picks as an
+// array with holes or as an object with numeric keys.
+function pickSlots(picks) {
+  if (!picks) return [];
+  return Object.keys(picks)
+    .filter((key) => picks[key] != null)
+    .map(Number)
+    .sort((a, b) => a - b);
+}
+
+// Where the next pick is stored: after the highest slot in use, so a gap left in
+// the picks can't make every new pick collide with an existing one.
+export function nextPickSlot(picks) {
+  const slots = pickSlots(picks);
+  return slots.length ? slots[slots.length - 1] + 1 : 0;
+}
+
+// The stored picks without the last one, for undo. Returns undefined (no change)
+// unless the last stored pick is still `expected`, so an undo confirmed after
+// someone else picked can't remove the wrong pick. With no picks it returns null:
+// Firebase may first run a transaction on an empty local copy, and then retries
+// with the server's value if that differs.
+export function withoutLastPick(picks, expected) {
+  const slots = pickSlots(picks);
+  if (!slots.length) return null;
+  if (!expected) return undefined;
+  const last = picks[slots[slots.length - 1]];
+  const same = ['player', 'category', 'item', 'at'].every((key) => last[key] === expected[key]);
+  if (!same) return undefined;
+  if (slots.length === 1) return null;
+  const out = {};
+  for (const slot of slots.slice(0, -1)) out[slot] = picks[slot];
+  return out;
 }
 
 // Returns null if the pick is legal, otherwise the reason it is not.

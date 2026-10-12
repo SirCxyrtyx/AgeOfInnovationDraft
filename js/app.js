@@ -1,7 +1,7 @@
 import { CATEGORIES, ITEMS, findItem, poolSize, MAX_PLAYERS, IMAGE_BASE, SPRITES } from './data.js';
 import {
   shuffle, buildTurnOrder, effectiveSeatOrder, availableItems, startProblems,
-  buildPool, draftState, pickProblem, remainingItems, newDraftId, buildBoard,
+  buildPool, draftState, pickProblem, remainingItems, newDraftId, buildBoard, withoutLastPick,
 } from './draft.js';
 import {
   BOARD_ITEMS, BOARD_SPRITES, GAME_BOARDS, gameBoardFor, COMPETENCY_BOARD, INNOVATION_BOARDS,
@@ -102,6 +102,12 @@ function savePlayerId(draftId, playerId) {
 function me() {
   const id = savedPlayers()[route.id];
   return id && draft && draft.players && draft.players[id] ? id : null;
+}
+
+// Whether this device may make the current pick: it is the current player, or the host.
+function canPick(state) {
+  const mine = me();
+  return !state.done && !!mine && (state.currentPlayer === mine || draft.hostId === mine);
 }
 
 function newPlayerId() {
@@ -239,10 +245,12 @@ function onRouteChange() {
       draftLoaded = true;
       const mine = me();
       if (mine) rememberDraft(route.id, draft.players[mine].name);
-      if (ui.selected && draft && draft.status === 'drafting') {
-        const state = draftState(draft);
-        const pick = pickProblem(state, state.currentPlayer, ui.selected.category, ui.selected.item);
-        if (pick) ui.selected = null;
+      if (ui.selected) {
+        const state = draft && draft.status === 'drafting' ? draftState(draft) : null;
+        if (!state || !canPick(state)
+          || pickProblem(state, state.currentPlayer, ui.selected.category, ui.selected.item)) {
+          ui.selected = null;
+        }
       }
       render();
     }, (err) => {
@@ -572,7 +580,7 @@ async function startDraft() {
 
 function renderDrafting(isHost) {
   const state = draftState(draft);
-  const canAct = !state.done && !!me() && (state.currentPlayer === me() || isHost);
+  const canAct = canPick(state);
 
   return h('div', { class: 'drafting' },
     renderTurnBanner(state, isHost),
@@ -756,10 +764,18 @@ function renderConfirmBar(state) {
   const forOther = state.currentPlayer !== me();
   const label = `${itemLabel(category, item)}${forOther ? ` for ${playerName(state.currentPlayer)}` : ''}`;
   const confirm = () => guarded(async () => {
-    const problem = pickProblem(state, state.currentPlayer, category, item);
-    if (problem) throw new Error(problem);
-    const ok = await backend.create(`drafts/${route.id}/picks/${state.pickIndex}`, {
-      player: state.currentPlayer, category, item, by: me(), at: Date.now(),
+    // Check against the latest snapshot: the turn may have moved on since this rendered.
+    const latest = draftState(draft);
+    const problem = canPick(latest)
+      ? pickProblem(latest, latest.currentPlayer, category, item)
+      : 'You can\'t make this pick any more.';
+    if (problem) {
+      ui.selected = null;
+      render();
+      throw new Error(problem);
+    }
+    const ok = await backend.create(`drafts/${route.id}/picks/${latest.nextSlot}`, {
+      player: latest.currentPlayer, category, item, by: me(), at: Date.now(),
     });
     ui.selected = null;
     if (!ok) toast('That pick was already made by someone else.', 'error');
@@ -779,7 +795,9 @@ function renderHostControls(state) {
     const last = state.picks[state.pickIndex - 1];
     if (!last) return;
     if (!confirm(`Undo ${playerName(last.player)}'s pick of ${itemLabel(last.category, last.item)}?`)) return;
-    await backend.set(`drafts/${route.id}/picks/${state.pickIndex - 1}`, null);
+    // Only removes the pick if it is still the last one, in case someone picked meanwhile.
+    const ok = await backend.transaction(`drafts/${route.id}/picks`, (picks) => withoutLastPick(picks, last));
+    if (!ok) toast('Nothing was undone: another pick was made in the meantime.', 'error');
   });
   const reset = () => guarded(async () => {
     if (!confirm('Return to the lobby? All picks and the drawn components will be discarded.')) return;
