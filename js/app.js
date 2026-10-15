@@ -1,7 +1,7 @@
 import { CATEGORIES, ITEMS, findItem, poolSize, MAX_PLAYERS, IMAGE_BASE, SPRITES } from './data.js';
 import {
   shuffle, buildTurnOrder, effectiveSeatOrder, availableItems, startProblems,
-  buildPool, draftState, pickProblem, remainingItems, newDraftId, buildBoard,
+  buildPool, draftState, pickProblem, remainingItems, newDraftId, buildBoard, withoutLastPick,
 } from './draft.js';
 import {
   BOARD_ITEMS, BOARD_SPRITES, GAME_BOARDS, gameBoardFor, COMPETENCY_BOARD, INNOVATION_BOARDS,
@@ -102,6 +102,12 @@ function savePlayerId(draftId, playerId) {
 function me() {
   const id = savedPlayers()[route.id];
   return id && draft && draft.players && draft.players[id] ? id : null;
+}
+
+// Whether this device may make the current pick: it is the current player, or the host.
+function canPick(state) {
+  const mine = me();
+  return !state.done && !!mine && (state.currentPlayer === mine || draft.hostId === mine);
 }
 
 function newPlayerId() {
@@ -239,10 +245,12 @@ function onRouteChange() {
       draftLoaded = true;
       const mine = me();
       if (mine) rememberDraft(route.id, draft.players[mine].name);
-      if (ui.selected && draft && draft.status === 'drafting') {
-        const state = draftState(draft);
-        const pick = pickProblem(state, state.currentPlayer, ui.selected.category, ui.selected.item);
-        if (pick) ui.selected = null;
+      if (ui.selected) {
+        const state = draft && draft.status === 'drafting' ? draftState(draft) : null;
+        if (!state || !canPick(state)
+          || pickProblem(state, state.currentPlayer, ui.selected.category, ui.selected.item)) {
+          ui.selected = null;
+        }
       }
       render();
     }, (err) => {
@@ -284,12 +292,17 @@ function renderHome() {
     ),
     h('section', { class: 'card' },
       h('h2', {}, 'Start a new draft'),
-      h('form', { class: 'row', onsubmit: create },
-        h('input', {
-          id: 'home-name', type: 'text', placeholder: 'Your name', maxlength: 40, value: ui.homeName,
-          autocomplete: 'nickname', oninput: (e) => { ui.homeName = e.target.value; },
-        }),
-        h('button', { class: 'primary', type: 'submit' }, 'Create draft'),
+      h('p', { class: 'muted small' },
+        'You\'ll be the host and the first player. The draft gets a code you can share with the others.'),
+      h('form', { onsubmit: create },
+        h('label', { class: 'field-label', for: 'home-name' }, 'Your player name'),
+        h('div', { class: 'row' },
+          h('input', {
+            id: 'home-name', type: 'text', placeholder: 'e.g. Alex', maxlength: 40, value: ui.homeName,
+            autocomplete: 'nickname', oninput: (e) => { ui.homeName = e.target.value; },
+          }),
+          h('button', { class: 'primary', type: 'submit' }, 'Create draft'),
+        ),
       ),
     ),
     h('section', { class: 'card' },
@@ -397,9 +410,11 @@ function renderIdentityPicker() {
       h('p', { class: 'muted small' }, 'Already in this draft (maybe on another device)? Pick yourself:'),
       h('div', { class: 'chips' }, seats.map((id) => h('button', { class: 'chip', onclick: () => claim(id) }, draft.players[id].name))),
     ],
-    draft.status === 'lobby'
-      ? renderJoinForm()
-      : h('p', { class: 'muted small' }, 'The draft has started, so new players can no longer join. You can watch without picking.'),
+    draft.status !== 'lobby'
+      ? h('p', { class: 'muted small' }, 'The draft has started, so new players can no longer join. You can watch without picking.')
+      : seats.length >= MAX_PLAYERS
+        ? h('p', { class: 'muted small' }, `The draft is full (${MAX_PLAYERS} players), so no one else can join. You can watch without picking.`)
+        : renderJoinForm(),
   );
 }
 
@@ -494,10 +509,11 @@ function renderSeat(id, index, seats, isHost) {
 }
 
 function renderSeatControls(seats) {
+  const full = seats.length >= MAX_PLAYERS;
   const addPlayer = (e) => {
     e.preventDefault();
     const name = ui.addName.trim();
-    if (!name) return;
+    if (!name || full) return;
     ui.addName = '';
     guarded(() => backend.set(`drafts/${route.id}/players/${newPlayerId()}`, { name, joinedAt: Date.now() }));
   };
@@ -515,10 +531,11 @@ function renderSeatControls(seats) {
     }, 'Shuffle seats now'),
     h('form', { class: 'row', onsubmit: addPlayer },
       h('input', {
-        id: 'add-name', type: 'text', placeholder: 'Add a player by name', maxlength: 40,
+        id: 'add-name', type: 'text', maxlength: 40, disabled: full,
+        placeholder: full ? `Full: ${MAX_PLAYERS} players` : 'Add a player by name',
         value: ui.addName, oninput: (e) => { ui.addName = e.target.value; },
       }),
-      h('button', { type: 'submit', class: 'small' }, 'Add'),
+      h('button', { type: 'submit', class: 'small', disabled: full }, 'Add'),
     ),
   );
 }
@@ -572,7 +589,7 @@ async function startDraft() {
 
 function renderDrafting(isHost) {
   const state = draftState(draft);
-  const canAct = !state.done && !!me() && (state.currentPlayer === me() || isHost);
+  const canAct = canPick(state);
 
   return h('div', { class: 'drafting' },
     renderTurnBanner(state, isHost),
@@ -777,10 +794,18 @@ function renderConfirmBar(state) {
   const forOther = state.currentPlayer !== me();
   const label = `${itemLabel(category, item)}${forOther ? ` for ${playerName(state.currentPlayer)}` : ''}`;
   const confirm = () => guarded(async () => {
-    const problem = pickProblem(state, state.currentPlayer, category, item);
-    if (problem) throw new Error(problem);
-    const ok = await backend.create(`drafts/${route.id}/picks/${state.pickIndex}`, {
-      player: state.currentPlayer, category, item, by: me(), at: Date.now(),
+    // Check against the latest snapshot: the turn may have moved on since this rendered.
+    const latest = draftState(draft);
+    const problem = canPick(latest)
+      ? pickProblem(latest, latest.currentPlayer, category, item)
+      : 'You can\'t make this pick any more.';
+    if (problem) {
+      ui.selected = null;
+      render();
+      throw new Error(problem);
+    }
+    const ok = await backend.create(`drafts/${route.id}/picks/${latest.nextSlot}`, {
+      player: latest.currentPlayer, category, item, by: me(), at: Date.now(),
     });
     ui.selected = null;
     if (!ok) toast('That pick was already made by someone else.', 'error');
@@ -800,7 +825,9 @@ function renderHostControls(state) {
     const last = state.picks[state.pickIndex - 1];
     if (!last) return;
     if (!confirm(`Undo ${playerName(last.player)}'s pick of ${itemLabel(last.category, last.item)}?`)) return;
-    await backend.set(`drafts/${route.id}/picks/${state.pickIndex - 1}`, null);
+    // Only removes the pick if it is still the last one, in case someone picked meanwhile.
+    const ok = await backend.transaction(`drafts/${route.id}/picks`, (picks) => withoutLastPick(picks, last));
+    if (!ok) toast('Nothing was undone: another pick was made in the meantime.', 'error');
   });
   const reset = () => guarded(async () => {
     if (!confirm('Return to the lobby? All picks and the drawn components will be discarded.')) return;

@@ -6,6 +6,7 @@ import { ROUND_SCORES, FINAL_SCORES } from '../js/board-data.js';
 import {
   toList, buildTurnOrder, effectiveSeatOrder, buildPool, draftState, pickProblem,
   startProblems, remainingItems, newDraftId, buildBoard, roundScoresValid,
+  nextPickSlot, withoutLastPick,
 } from '../js/draft.js';
 
 test('reverse snake starts with the last seat', () => {
@@ -119,6 +120,32 @@ test('pickProblem rejects illegal picks', () => {
   assert.equal(state.currentPlayer, 'a', 'snake: a picks twice in a row');
   assert.ok(pickProblem(state, 'a', 'factions', 'omar'), 'already has a faction');
   assert.equal(pickProblem(state, 'a', 'terrains', 'lake'), null);
+});
+
+test('undo removes only the last pick, and only if it is the expected one', () => {
+  const p0 = { player: 'b', category: 'factions', item: 'blessed', at: 1 };
+  const p1 = { player: 'a', category: 'factions', item: 'moles', at: 2 };
+  const p2 = { player: 'a', category: 'terrains', item: 'lake', at: 3 };
+  assert.deepEqual(withoutLastPick([p0, p1], p1), { 0: p0 });
+  assert.equal(withoutLastPick([p0], p0), null);
+  // The host confirmed undoing p1, but p2 was picked meanwhile: nothing changes.
+  assert.equal(withoutLastPick([p0, p1, p2], p1), undefined);
+  assert.equal(withoutLastPick(null, p0), null);
+  // Firebase may return sparse picks as an object.
+  assert.deepEqual(withoutLastPick({ 0: p0, 2: p2 }, p2), { 0: p0 });
+});
+
+test('the next pick goes after the highest stored slot', () => {
+  assert.equal(nextPickSlot(null), 0);
+  assert.equal(nextPickSlot(['x', 'y']), 2);
+  // A gap must not make the next pick collide with slot 2.
+  assert.equal(nextPickSlot({ 0: 'x', 2: 'z' }), 3);
+  assert.equal(nextPickSlot(['x', null, 'z']), 3);
+  const draft = playDraft(['a', 'b']);
+  draft.picks = { 0: { player: 'b', category: 'factions', item: draft.pool.factions[0] }, 2: { player: 'a', category: 'factions', item: draft.pool.factions[1] } };
+  const state = draftState(draft);
+  assert.equal(state.pickIndex, 2);
+  assert.equal(state.nextSlot, 3);
 });
 
 test('draft ids are 6 unambiguous characters', () => {
