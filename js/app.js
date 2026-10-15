@@ -20,7 +20,7 @@ let draftLoaded = false;
 let unsubscribe = null;
 let ui = {
   selected: null, joinName: null, addName: '', homeName: null, joinCode: '',
-  boardOpen: true, boardDetailsOpen: false,
+  boardOpen: true, boardDetailsOpen: false, unusedOpen: {},
 };
 
 const ALL_SPRITES = { ...SPRITES, ...BOARD_SPRITES };
@@ -727,7 +727,28 @@ function renderPoolCategory({ key, plural }, state, canAct) {
         h('span', { class: 'item-text' }, item.text),
         takenBy && h('span', { class: 'item-taken' }, `Taken by ${playerName(takenBy)}`)));
     })),
+    renderUnusedItems(key, state),
   );
+}
+
+// The components of a category that weren't drawn for this draft, in the same
+// style as the board's Tile details list.
+function renderUnusedItems(key, state) {
+  const excluded = (draft.excluded && draft.excluded[key]) || {};
+  const unused = ITEMS[key].filter((item) => !state.pool[key].includes(item.id));
+  if (unused.length === 0) return null;
+  return h('details', {
+    class: 'board-details unused-items',
+    open: !!ui.unusedOpen[key],
+    ontoggle: (e) => { ui.unusedOpen[key] = e.target.open; },
+  },
+  h('summary', {}, `Not in this draft (${unused.length})`),
+  h('ul', {}, unused.map((item) => h('li', {},
+    tileImage(key, item, 'mini'),
+    h('span', {},
+      h('strong', {}, item.color && h('span', { class: 'swatch' , style: { '--swatch': item.color } }), `${item.name}. `),
+      item.text,
+      excluded[item.id] && h('span', { class: 'muted' }, ' (excluded by the host)'))))));
 }
 
 function renderPlayerTable(state) {
