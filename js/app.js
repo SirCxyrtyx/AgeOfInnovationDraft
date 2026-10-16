@@ -727,10 +727,9 @@ function renderBoardSetup(board, n) {
     n === 2 && h('p', { class: 'muted small' },
       '2-player game: also place 1 Area Score tile face down (it is revealed in Round 6).'),
     h('div', { class: 'board-layout' },
-      h('div', {}, h('h3', {}, 'Game board'), renderGameBoard(board, n), renderBoardDetails(board)),
-      h('div', { class: 'board-side' },
-        h('div', {}, h('h3', {}, 'Innovation display'), renderInnovationDisplay(board, n)),
-        renderTerrainWheel()))),
+      h('div', {}, h('h3', {}, 'Game board'), renderGameBoard(board, n)),
+      h('div', {}, h('h3', {}, 'Innovation display'), renderInnovationDisplay(board, n))),
+    renderBoardDetails(board)),
   );
 }
 
@@ -771,6 +770,7 @@ function renderPoolCategory({ key, plural }, state, canAct) {
   return h('section', { class: `card pool-category${filled ? ' filled' : ''}` },
     h('h2', {}, plural, filled && !state.done && h('span', { class: 'muted small' },
       current === me() ? ' · you already have one' : ` · ${playerName(current)} already has one`)),
+    key === 'terrains' && renderTerrainWheel(),
     h('div', { class: 'items' }, state.pool[key].map((id) => {
       const item = findItem(key, id);
       const takenBy = state.pickedBy[key][id];

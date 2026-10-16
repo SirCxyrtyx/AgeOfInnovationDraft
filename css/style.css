@@ -304,7 +304,6 @@ table.players tr.me td:nth-child(2) { font-weight: 700; }
 .board-setup > details[open] > summary::before { content: "▾ "; }
 .board-layout { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; margin-top: 12px; }
 .board-layout > div:last-child { max-width: 720px; }
-.board-side .terrain-wheel { margin: 0 auto; }
 .board-figure {
   position: relative;
   width: 100%;
@@ -313,7 +312,7 @@ table.players tr.me td:nth-child(2) { font-weight: 700; }
   overflow: hidden;
 }
 .board-figure .tile.placed { position: absolute; box-shadow: none; border-radius: 0; }
-.no-tile-images .board-figure, .no-tile-images .board-layout > div > h3, .no-tile-images .board-side > div:first-child, .no-tile-images .board-details .tile { display: none; }
+.no-tile-images .board-figure, .no-tile-images .board-layout, .no-tile-images .board-details .tile { display: none; }
 .innovation-display { display: flex; flex-direction: column; gap: 0; }
 .board-details { margin-top: 12px; }
 .board-details > summary { cursor: pointer; font-weight: 600; }
@@ -327,9 +326,7 @@ table.players tr.me td:nth-child(2) { font-weight: 700; }
 .unused-items .swatch { margin-right: 4px; vertical-align: -2px; }
 
 /* terraforming circle */
-.board-side { display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-start; }
-.board-side > div:first-child { flex: 1 1 100%; }
-.terrain-wheel { margin: 0; width: 320px; max-width: 100%; }
+.terrain-wheel { margin: 0 auto 16px; width: 320px; max-width: 100%; }
 .terrain-wheel figcaption { margin-bottom: 8px; }
 .terrain-wheel figcaption h3 { margin: 0; }
 .wheel {
