@@ -1,4 +1,6 @@
-import { CATEGORIES, ITEMS, findItem, poolSize, MAX_PLAYERS, IMAGE_BASE, SPRITES } from './data.js';
+import {
+  CATEGORIES, ITEMS, findItem, poolSize, MAX_PLAYERS, IMAGE_BASE, SPRITES, TERRAFORMING_CIRCLE, TERRAIN_EMBLEM,
+} from './data.js';
 import {
   shuffle, buildTurnOrder, effectiveSeatOrder, availableItems, startProblems,
   buildPool, draftState, pickProblem, remainingItems, newDraftId, buildBoard, withoutLastPick,
@@ -674,6 +676,47 @@ function renderBoardDetails(board) {
   h('ul', {}, board.competencies.map((id) => row('competencies', boardItem('competencies', id)))));
 }
 
+// The Terraforming Circle, built from the emblems on the terrain cards. Terrains
+// not drawn for this draft are faded; taken ones show who took them.
+function renderTerrainWheel() {
+  const state = draftState(draft);
+  const e = TERRAIN_EMBLEM;
+  const sheet = SPRITES.terrains;
+  const count = TERRAFORMING_CIRCLE.length;
+  return h('figure', { class: 'terrain-wheel' },
+    h('figcaption', {}, h('h3', {}, 'Terraforming Circle'),
+      h('span', { class: 'muted small' }, 'Spades needed to terraform = steps apart (1–3)')),
+    h('div', { class: 'wheel' },
+      TERRAFORMING_CIRCLE.map((id, i) => {
+        const terrain = findItem('terrains', id);
+        const angle = (i / count) * 2 * Math.PI - Math.PI / 2;
+        const inDraft = state.pool.terrains.includes(id);
+        const takenBy = state.pickedBy.terrains[id];
+        const left = e.x + terrain.sprite * e.cellWidth;
+        return h('div', {
+          class: `wheel-spot${inDraft ? '' : ' not-drawn'}${takenBy ? ' taken' : ''}${takenBy && takenBy === me() ? ' mine' : ''}`,
+          style: {
+            left: `${50 + 34 * Math.cos(angle)}%`,
+            top: `${47 + 34 * Math.sin(angle)}%`,
+          },
+          title: `${terrain.name}${inDraft ? '' : ' (not in this draft)'}${takenBy ? `: taken by ${playerName(takenBy)}` : ''}`,
+        },
+        h('span', {
+          class: 'wheel-disc',
+          style: {
+            'background-color': terrain.color,
+            'background-image': `url("${IMAGE_BASE}${sheet.file}")`,
+            'background-size': `${(e.sheetWidth / e.size) * 100}% ${(e.sheetHeight / e.size) * 100}%`,
+            'background-position': `${(left / (e.sheetWidth - e.size)) * 100}% ${(e.y / (e.sheetHeight - e.size)) * 100}%`,
+          },
+        }),
+        h('span', { class: 'wheel-label' },
+          terrain.name,
+          !inDraft && h('span', { class: 'wheel-sub' }, 'not in draft'),
+          takenBy && h('span', { class: 'wheel-sub taken-by' }, playerName(takenBy))));
+      })));
+}
+
 function renderBoardSetup(board, n) {
   return h('section', { class: 'card board-setup' },
     h('details', {
@@ -684,9 +727,10 @@ function renderBoardSetup(board, n) {
     n === 2 && h('p', { class: 'muted small' },
       '2-player game: also place 1 Area Score tile face down (it is revealed in Round 6).'),
     h('div', { class: 'board-layout' },
-      h('div', {}, h('h3', {}, 'Game board'), renderGameBoard(board, n)),
-      h('div', {}, h('h3', {}, 'Innovation display'), renderInnovationDisplay(board, n))),
-    renderBoardDetails(board)),
+      h('div', {}, h('h3', {}, 'Game board'), renderGameBoard(board, n), renderBoardDetails(board)),
+      h('div', { class: 'board-side' },
+        h('div', {}, h('h3', {}, 'Innovation display'), renderInnovationDisplay(board, n)),
+        renderTerrainWheel()))),
   );
 }
 

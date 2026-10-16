@@ -81,6 +81,13 @@ export const SPRITES = {
   bonuses: { file: 'bonus_cards.png', cols: 10, rows: 2, aspect: 150 / 400 },
 };
 
+// The Terraforming Circle, clockwise from the top. The number of Spades needed to
+// terraform one terrain into another is the number of steps between them (1–3).
+export const TERRAFORMING_CIRCLE = ['desert', 'plains', 'swamp', 'lake', 'forest', 'mountain', 'wasteland'];
+
+// Where the round terrain emblem sits on each terrain card, in sprite pixels.
+export const TERRAIN_EMBLEM = { x: 83, y: 44, size: 120, cellWidth: 2000 / 7, sheetWidth: 2000, sheetHeight: 436 };
+
 export const ITEMS = {
   factions: FACTIONS,
   terrains: TERRAINS,
