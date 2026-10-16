@@ -683,9 +683,7 @@ function renderTerrainWheel() {
   const e = TERRAIN_EMBLEM;
   const sheet = SPRITES.terrains;
   const count = TERRAFORMING_CIRCLE.length;
-  return h('figure', { class: 'terrain-wheel' },
-    h('figcaption', {}, h('h3', {}, 'Terraforming Circle'),
-      h('span', { class: 'muted small' }, 'Spades needed to terraform = steps apart (1–3)')),
+  return h('figure', { class: 'terrain-wheel', 'aria-label': 'Terraforming Circle' },
     h('div', { class: 'wheel' },
       TERRAFORMING_CIRCLE.map((id, i) => {
         const terrain = findItem('terrains', id);

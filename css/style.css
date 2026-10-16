@@ -327,8 +327,6 @@ table.players tr.me td:nth-child(2) { font-weight: 700; }
 
 /* terraforming circle */
 .terrain-wheel { margin: 0 auto 16px; width: 320px; max-width: 100%; }
-.terrain-wheel figcaption { margin-bottom: 8px; }
-.terrain-wheel figcaption h3 { margin: 0; }
 .wheel {
   position: relative;
   aspect-ratio: 1;
