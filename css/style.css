@@ -326,19 +326,25 @@ table.players tr.me td:nth-child(2) { font-weight: 700; }
 .unused-items .swatch { margin-right: 4px; vertical-align: -2px; }
 
 /* terraforming circle */
+@property --wheel-rot { syntax: '<angle>'; inherits: true; initial-value: 0deg; }
 .terrain-wheel { margin: 0 auto 16px; width: 320px; max-width: 100%; }
 .wheel {
   position: relative;
   aspect-ratio: 1;
+  --wheel-rot: 0deg;
+  transition: --wheel-rot 0.9s cubic-bezier(0.65, 0, 0.35, 1);
   border-radius: 50%;
   background:
     radial-gradient(circle at 50% 50%, #3b2a14 0 17%, #a07a3a 18% 20%, transparent 21%),
     radial-gradient(circle at 50% 50%, #5b4320 0 58%, #c79b4f 59% 61%, #4a3518 62% 70%, transparent 71%);
 }
+.wheel-rotor { position: absolute; inset: 0; transform: rotate(var(--wheel-rot)); transform-origin: 50% 47%; }
+@media (prefers-reduced-motion: reduce) { .wheel { transition: none; } }
 .wheel-spot {
   position: absolute;
   width: 21%;
-  transform: translate(-50%, -50%);
+  /* Counter-rotate so the emblems and names stay upright. */
+  transform: translate(-50%, -50%) rotate(calc(-1 * var(--wheel-rot)));
   display: flex;
   flex-direction: column;
   align-items: center;

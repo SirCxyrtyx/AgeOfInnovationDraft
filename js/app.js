@@ -678,13 +678,38 @@ function renderBoardDetails(board) {
 
 // The Terraforming Circle, built from the emblems on the terrain cards. Terrains
 // not drawn for this draft are faded; taken ones show who took them.
+// The terrain to turn to the top of the wheel: the terrain this player has
+// selected but not yet confirmed, otherwise the one they drafted.
+function wheelFocus(state) {
+  if (ui.selected && ui.selected.category === 'terrains') return ui.selected.item;
+  const mine = me() && state.byPlayer[me()];
+  return (mine && mine.terrains) || null;
+}
+
 function renderTerrainWheel() {
   const state = draftState(draft);
   const e = TERRAIN_EMBLEM;
   const sheet = SPRITES.terrains;
   const count = TERRAFORMING_CIRCLE.length;
-  return h('figure', { class: 'terrain-wheel', 'aria-label': 'Terraforming Circle' },
-    h('div', { class: 'wheel' },
+
+  // Turn the focused terrain to the top, the short way round. Start from the
+  // angle the wheel on screen has reached, in case it is part-way through a turn.
+  // A wheel that isn't on screen yet (page load) appears already turned.
+  const focus = TERRAFORMING_CIRCLE.indexOf(wheelFocus(state));
+  let target = focus < 0 ? 0 : (-360 * focus) / count;
+  const onScreen = document.querySelector('.wheel');
+  const current = onScreen ? parseFloat(getComputedStyle(onScreen).getPropertyValue('--wheel-rot')) : NaN;
+  const start = Number.isFinite(current) ? current : target;
+  target += 360 * Math.round((start - target) / 360);
+  const wheel = h('div', { class: 'wheel', style: { '--wheel-rot': `${start}deg` } });
+  if (Math.abs(target - start) > 0.01) {
+    requestAnimationFrame(() => {
+      void wheel.offsetWidth; // apply the starting angle before changing it
+      wheel.style.setProperty('--wheel-rot', `${target}deg`);
+    });
+  }
+
+  wheel.append(h('div', { class: 'wheel-rotor' },
       TERRAFORMING_CIRCLE.map((id, i) => {
         const terrain = findItem('terrains', id);
         const angle = (i / count) * 2 * Math.PI - Math.PI / 2;
@@ -713,6 +738,7 @@ function renderTerrainWheel() {
           !inDraft && h('span', { class: 'wheel-sub' }, 'not in draft'),
           takenBy && h('span', { class: 'wheel-sub taken-by' }, playerName(takenBy))));
       })));
+  return h('figure', { class: 'terrain-wheel', 'aria-label': 'Terraforming Circle' }, wheel);
 }
 
 function renderBoardSetup(board, n) {
